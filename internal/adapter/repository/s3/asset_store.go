@@ -28,9 +28,10 @@ func NewAssetStore(endpoint, accessKey, secretKey, bucket string, usePathStyle b
 	if usePathStyle {
 		lookup = minio.BucketLookupPath
 	}
-	cli, err := minio.New(endpoint, &minio.Options{
+	host, secure := splitEndpointScheme(endpoint)
+	cli, err := minio.New(host, &minio.Options{
 		Creds:        credentials.NewStaticV4(accessKey, secretKey, ""),
-		Secure:       useSecureTLS(endpoint),
+		Secure:       secure,
 		BucketLookup: lookup,
 	})
 	if err != nil {
@@ -80,7 +81,18 @@ func (s *AssetStore) objectURL(key string) string {
 	return fmt.Sprintf("https://%s/%s/%s", s.client.EndpointURL().Host, s.bucket, key)
 }
 
-// useSecureTLS returns true unless the endpoint explicitly uses http://.
-func useSecureTLS(endpoint string) bool {
-	return !strings.HasPrefix(strings.ToLower(endpoint), "http://")
+// splitEndpointScheme strips an optional scheme prefix from the endpoint and
+// reports whether TLS should be used. minio-go prepends the scheme itself, so
+// the endpoint it receives must be a bare host[:port]. Bare endpoints default
+// to TLS; an explicit http:// prefix forces plaintext (local MinIO).
+func splitEndpointScheme(endpoint string) (host string, secure bool) {
+	lower := strings.ToLower(endpoint)
+	switch {
+	case strings.HasPrefix(lower, "http://"):
+		return endpoint[len("http://"):], false
+	case strings.HasPrefix(lower, "https://"):
+		return endpoint[len("https://"):], true
+	default:
+		return endpoint, true
+	}
 }
