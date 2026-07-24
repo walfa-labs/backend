@@ -53,6 +53,7 @@ func main() {
 	assetRepo := postgres.NewAssetRepo(db)
 	adminRepo := postgres.NewAdminRepo(db)
 	statsRepo := postgres.NewStatsRepo(db)
+	profileRepo := postgres.NewProfileRepo(db)
 
 	assetStore, err := s3store.NewAssetStore(
 		cfg.ObjectStorage.Endpoint,
@@ -72,6 +73,7 @@ func main() {
 	authSvc := service.NewAuthService(adminRepo, cfg.JWTSecretKey, cfg.JWTAccessTTL, cfg.JWTRefreshTTL)
 	assetSvc := service.NewAssetService(assetRepo, assetStore)
 	statsSvc := service.NewStatsService(statsRepo)
+	profileSvc := service.NewProfileService(profileRepo)
 
 	// --- Handlers (driving adapters) ---
 	healthH := handler.NewHealthHandler(db)
@@ -81,6 +83,7 @@ func main() {
 	authH := handler.NewAuthHandler(authSvc, int(cfg.JWTRefreshTTL.Hours()))
 	assetH := handler.NewAssetHandler(assetSvc)
 	statsH := handler.NewStatsHandler(statsSvc, tagRepo)
+	profileH := handler.NewProfileHandler(profileSvc)
 
 	// --- Auth middleware ---
 	authMiddleware := middleware.Auth(cfg, logger)
@@ -96,6 +99,7 @@ func main() {
 		Auth:           authH,
 		Asset:          assetH,
 		Stats:          statsH,
+		Profile:        profileH,
 		Logger:         logger,
 		AuthMiddleware: authMiddleware,
 	})

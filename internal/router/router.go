@@ -21,6 +21,7 @@ type Deps struct {
 	Auth           *handler.AuthHandler
 	Asset          *handler.AssetHandler
 	Stats          *handler.StatsHandler
+	Profile        *handler.ProfileHandler
 	Logger         *slog.Logger
 	AuthMiddleware fiber.Handler
 }
@@ -50,6 +51,9 @@ func Register(app *fiber.App, deps Deps) {
 
 	api.Get("/tags", deps.Stats.Tags)
 	api.Get("/stats/summary", deps.Stats.Summary)
+
+	// --- Profile (public singleton) ---
+	api.Get("/profile", deps.Profile.Get)
 
 	// --- Assets (public redirect) ---
 	api.Get("/assets/*", deps.Asset.Redirect)
@@ -100,4 +104,8 @@ func Register(app *fiber.App, deps Deps) {
 	// Stats (admin)
 	admin.Get("/stats/views", deps.Stats.ViewsTimeSeries)
 	admin.Get("/stats/top-posts", deps.Stats.TopPosts)
+
+	// Profile (admin singleton — upsert)
+	admin.Get("/profile", deps.Profile.AdminGet)
+	admin.Put("/profile", deps.Profile.Update)
 }

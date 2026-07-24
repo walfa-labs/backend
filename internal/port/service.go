@@ -126,3 +126,22 @@ type StatsService interface {
 	ViewsTimeSeries(ctx context.Context, from, to time.Time, bucket string) ([]ViewsBucket, error)
 	TopPosts(ctx context.Context, limit int) ([]TopPost, error)
 }
+
+// ProfileService is the use-case port for the singleton profile.
+type ProfileService interface {
+	Get(ctx context.Context) (*domain.Profile, error)
+	Update(ctx context.Context, input ProfileInput) (*domain.Profile, error)
+}
+
+// ProfileInput is the write payload for the singleton profile.
+type ProfileInput struct {
+	Name        string
+	Email       string
+	Tagline     string
+	BioMarkdown string
+	Location    string
+	AvatarURL   string
+	GitHubURL   string
+	LinkedInURL string
+	TwitterURL  string
+}

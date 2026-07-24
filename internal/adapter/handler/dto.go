@@ -382,3 +382,59 @@ func toAssetResponse(a *domain.Asset) assetResponse {
 		SizeBytes:   a.SizeBytes,
 	}
 }
+
+// --- Profile DTOs ---
+
+type ProfileResponse struct {
+	Name        string `json:"name"`
+	Email       string `json:"email"`
+	Tagline     string `json:"tagline"`
+	BioMarkdown string `json:"bioMarkdown"`
+	Location    string `json:"location"`
+	AvatarURL   string `json:"avatarUrl"`
+	GitHubURL   string `json:"githubUrl"`
+	LinkedInURL string `json:"linkedinUrl"`
+	TwitterURL  string `json:"twitterUrl"`
+	UpdatedAt   string `json:"updatedAt"`
+}
+
+type profileRequest struct {
+	Name        string `json:"name" validate:"required"`
+	Email       string `json:"email"`
+	Tagline     string `json:"tagline"`
+	BioMarkdown string `json:"bioMarkdown"`
+	Location    string `json:"location"`
+	AvatarURL   string `json:"avatarUrl"`
+	GitHubURL   string `json:"githubUrl"`
+	LinkedInURL string `json:"linkedinUrl"`
+	TwitterURL  string `json:"twitterUrl"`
+}
+
+func toProfileResponse(p *domain.Profile) ProfileResponse {
+	return ProfileResponse{
+		Name:        p.Name,
+		Email:       p.Email,
+		Tagline:     p.Tagline,
+		BioMarkdown: p.BioMarkdown,
+		Location:    p.Location,
+		AvatarURL:   p.AvatarURL,
+		GitHubURL:   p.GitHubURL,
+		LinkedInURL: p.LinkedInURL,
+		TwitterURL:  p.TwitterURL,
+		UpdatedAt:   p.UpdatedAt.Format(time.RFC3339),
+	}
+}
+
+func (r profileRequest) toInput() port.ProfileInput {
+	return port.ProfileInput{
+		Name:        r.Name,
+		Email:       r.Email,
+		Tagline:     r.Tagline,
+		BioMarkdown: r.BioMarkdown,
+		Location:    r.Location,
+		AvatarURL:   r.AvatarURL,
+		GitHubURL:   r.GitHubURL,
+		LinkedInURL: r.LinkedInURL,
+		TwitterURL:  r.TwitterURL,
+	}
+}

@@ -85,6 +85,12 @@ type AdminRepo interface {
 	GetByUsername(ctx context.Context, username string) (*domain.AdminUser, error)
 }
 
+// ProfileRepo persists the singleton Profile aggregate.
+type ProfileRepo interface {
+	Get(ctx context.Context) (*domain.Profile, error)
+	Upsert(ctx context.Context, p *domain.Profile) error
+}
+
 // AssetStore is the Strategy interface for object storage backends (S3, local FS).
 type AssetStore interface {
 	Upload(ctx context.Context, key string, r io.Reader, contentType string, size int64) (url string, err error)
