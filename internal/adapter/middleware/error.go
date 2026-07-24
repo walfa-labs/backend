@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gookit/slog"
 
 	"github.com/walfa-labs/backend/internal/domain"
 )
@@ -122,7 +123,13 @@ func ErrorHandler(c fiber.Ctx, err error) error {
 		})
 	}
 
-	// Fallback: any unmapped error is a 500.
+	// Fallback: any unmapped error is a 500. Log the underlying cause — the
+	// client envelope intentionally hides it.
+	slog.WithFields(map[string]any{
+		"request_id": RequestIDFromContext(c),
+		"method":     c.Method(),
+		"path":       c.Path(),
+	}).Error(err)
 	return c.Status(fiber.StatusInternalServerError).JSON(ErrorEnvelope{
 		Error: ErrorBody{
 			Code:      CodeInternalError,
