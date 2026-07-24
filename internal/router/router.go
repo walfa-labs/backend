@@ -52,7 +52,7 @@ func Register(app *fiber.App, deps Deps) {
 	api.Get("/stats/summary", deps.Stats.Summary)
 
 	// --- Assets (public redirect) ---
-	api.Get("/assets/:key", deps.Asset.Redirect)
+	api.Get("/assets/*", deps.Asset.Redirect)
 
 	// --- Auth (rate-limited) ---
 	auth := api.Group("/auth")
@@ -95,7 +95,7 @@ func Register(app *fiber.App, deps Deps) {
 
 	// Assets
 	admin.Post("/assets", deps.Asset.Upload)
-	admin.Delete("/assets/:key", deps.Asset.Delete)
+	admin.Delete("/assets/*", deps.Asset.Delete)
 
 	// Stats (admin)
 	admin.Get("/stats/views", deps.Stats.ViewsTimeSeries)

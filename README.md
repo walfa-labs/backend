@@ -60,7 +60,7 @@ GET /api/v1/blog/posts
 GET /api/v1/blog/posts/:slug
 GET /api/v1/tags
 GET /api/v1/stats/summary
-GET /api/v1/assets/:key          → redirect to signed URL
+GET /api/v1/assets/*          → redirect to signed URL
 GET /api/v1/health
 ```
 
@@ -95,7 +95,7 @@ DELETE /api/v1/admin/blog/posts/:id
 PATCH  /api/v1/admin/blog/posts/:id/status    → { status: "published"|"draft" }
 
 POST   /api/v1/admin/assets                     → multipart upload
-DELETE /api/v1/admin/assets/:key
+DELETE /api/v1/admin/assets/*
 
 GET    /api/v1/admin/stats/views?from=&to=&bucket=
 GET    /api/v1/admin/stats/top-posts?limit=

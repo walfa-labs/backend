@@ -40,9 +40,10 @@ func (h *AssetHandler) Upload(c fiber.Ctx) error {
 	return Created(c, "/api/v1/admin/assets/"+asset.Key, toAssetResponse(asset))
 }
 
-// Redirect handles GET /api/v1/assets/:key — redirects to a presigned URL.
+// Redirect handles GET /api/v1/assets/* — redirects to a presigned URL.
+// The wildcard captures multi-segment keys like "images/<uuid>.png".
 func (h *AssetHandler) Redirect(c fiber.Ctx) error {
-	key := c.Params("key")
+	key := c.Params("*")
 	if key == "" {
 		return domain.ErrNotFound
 	}
@@ -56,9 +57,9 @@ func (h *AssetHandler) Redirect(c fiber.Ctx) error {
 	return c.Redirect().To(url)
 }
 
-// Delete handles DELETE /api/v1/admin/assets/:key.
+// Delete handles DELETE /api/v1/admin/assets/*.
 func (h *AssetHandler) Delete(c fiber.Ctx) error {
-	key := c.Params("key")
+	key := c.Params("*")
 	if key == "" {
 		return domain.NewValidationError("key", "required")
 	}
