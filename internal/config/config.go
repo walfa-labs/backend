@@ -22,11 +22,11 @@ type Config struct {
 	AdminPasswordHash string `env:"ADMIN_PASSWORD_HASH,required"`
 
 	ObjectStorage struct {
-		Endpoint     string `env:"OBJECT_STORAGE_ENDPOINT" envDefault:"localhost:9000"`
-		Bucket       string `env:"OBJECT_STORAGE_BUCKET" envDefault:"portfolio-assets"`
-		AccessKey    string `env:"OBJECT_STORAGE_ACCESS_KEY" envDefault:"minio"`
-		SecretKey    string `env:"OBJECT_STORAGE_SECRET_KEY" envDefault:"minio123"`
-		UsePathStyle bool   `env:"OBJECT_STORAGE_USE_PATH_STYLE" envDefault:"true"`
+		Endpoint     string `env:"ENDPOINT" envDefault:"localhost:9000"`
+		Bucket       string `env:"BUCKET" envDefault:"portfolio-assets"`
+		AccessKey    string `env:"ACCESS_KEY" envDefault:"minio"`
+		SecretKey    string `env:"SECRET_KEY" envDefault:"minio123"`
+		UsePathStyle bool   `env:"USE_PATH_STYLE" envDefault:"true"`
 	} `envPrefix:"OBJECT_STORAGE_"`
 
 	CORSAllowedOrigins []string `env:"CORS_ALLOWED_ORIGINS" envDefault:"http://localhost:3000" envSeparator:","`
