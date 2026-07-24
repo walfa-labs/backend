@@ -22,7 +22,7 @@ func NewPostRepo(pool *pgxpool.Pool) *PostRepo {
 	return &PostRepo{pool: pool}
 }
 
-const postColumns = `id, slug, title, excerpt, body_markdown, cover_image_url, status,
+const postColumns = `id, slug, title, COALESCE(excerpt, ''), COALESCE(body_markdown, ''), COALESCE(cover_image_url, ''), status,
 	view_count, published_at, created_at, updated_at`
 
 func scanPost(row pgx.Row) (*domain.BlogPost, error) {
@@ -54,7 +54,7 @@ func (r *PostRepo) ListPublished(ctx context.Context, filter port.PostFilter) ([
 
 	if filter.Tag == "" {
 		rows, err := r.pool.Query(ctx, `
-			SELECT id, slug, title, excerpt, cover_image_url, published_at
+			SELECT id, slug, title, COALESCE(excerpt, ''), COALESCE(cover_image_url, ''), published_at
 			FROM blog_post
 			WHERE status = 'published'
 			ORDER BY published_at DESC NULLS LAST
@@ -67,7 +67,7 @@ func (r *PostRepo) ListPublished(ctx context.Context, filter port.PostFilter) ([
 	}
 
 	rows, err := r.pool.Query(ctx, `
-		SELECT bp.id, bp.slug, bp.title, bp.excerpt, bp.cover_image_url, bp.published_at
+		SELECT bp.id, bp.slug, bp.title, COALESCE(bp.excerpt, ''), COALESCE(bp.cover_image_url, ''), bp.published_at
 		FROM blog_post bp
 		JOIN post_tag pt ON pt.post_id = bp.id
 		JOIN tag t ON t.id = pt.tag_id

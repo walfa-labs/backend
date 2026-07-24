@@ -22,8 +22,8 @@ func NewProjectRepo(pool *pgxpool.Pool) *ProjectRepo {
 	return &ProjectRepo{pool: pool}
 }
 
-const projectColumns = `id, slug, title, tagline, description_markdown, cover_image_url,
-	repo_url, demo_url, tech_stack, status, featured, sort_order, published_at,
+const projectColumns = `id, slug, title, COALESCE(tagline, ''), COALESCE(description_markdown, ''), COALESCE(cover_image_url, ''),
+	COALESCE(repo_url, ''), COALESCE(demo_url, ''), tech_stack, status, featured, sort_order, published_at,
 	created_at, updated_at`
 
 func scanProject(row pgx.Row) (*domain.Project, error) {
