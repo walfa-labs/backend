@@ -26,6 +26,7 @@ read-only and cache-friendly.
 | Auth | `github.com/golang-jwt/jwt/v5` (HS256) + `golang.org/x/crypto/bcrypt` |
 | Object storage | `github.com/minio/minio-go/v7` (S3-compatible: MinIO, R2, S3) |
 | Config | `github.com/caarlos0/env/v11` (environment variables only) |
+| API docs | `github.com/gofiber/contrib/v3/swaggerui` (Swagger UI serving `docs/openapi.yaml`) |
 
 ## Architecture
 
@@ -51,6 +52,7 @@ internal/
   platform/                → infrastructure factories: server (Fiber config), db pool,
                              logger, json (Sonic), validator
 migrations/                → NNNN_name.up.sql / NNNN_name.down.sql + seed.sql
+docs/                      → OpenAPI 3 spec (openapi.yaml); served by swaggerui
 ```
 
 Request flow: `router` → `middleware` chain → `handler` (bind + validate request DTO,
@@ -87,6 +89,9 @@ Route groups (see `internal/router/router.go`):
   `PATCH /admin/blog/posts/:id/status`, asset upload (`POST /admin/assets`, multipart,
   10 MB max, images only) and delete, stats (`/admin/stats/views`, `/admin/stats/top-posts`),
   profile upsert (`PUT /admin/profile`)
+- Docs (outside `/api/v1`, public): Swagger UI at `/swagger`, OpenAPI spec at
+  `/docs/openapi.yaml` (wired via `swaggerui.New` in `router.Register`; the spec file
+  is read from `./docs/openapi.yaml` at startup — run from the repo root)
 
 JSON field names are camelCase (e.g. `coverImageUrl`, `sortOrder`, `experienceType`).
 Dates in requests are `YYYY-MM-DD`; timestamps in responses are RFC3339.
@@ -127,7 +132,7 @@ Required infrastructure — assumed already running; point `.env` at it
 1. PostgreSQL 16+ reachable via `DATABASE_URL`
 2. S3-compatible store (MinIO locally) with the bucket created
 3. Migrations applied: `migrate -path migrations -database "$DATABASE_URL" up`
-4. An `admin_user` row with a bcrypt `password_hash` (login reads the DB table,
+4. An `admin_users` row with a bcrypt `password_hash` (login reads the DB table,
    not `ADMIN_PASSWORD_HASH`); `migrations/seed.sql` holds demo content data
 
 ## Configuration
@@ -166,8 +171,9 @@ switches logger behavior), `APP_PORT` (default `:8080`), `JWT_ACCESS_TTL`/`JWT_R
   `domain.ErrNotFound`; multi-table writes (post+tags, experience+highlights,
   project+links) run in a `pgx.Tx`; nullable columns are read with `COALESCE(col, '')`;
   `RowsAffected() == 0` on UPDATE/DELETE → `domain.ErrNotFound`.
-- **Naming**: DB tables are singular snake_case (`blog_post`, `experience_highlight`);
-  Go entities singular (`domain.BlogPost`); DTO JSON fields camelCase.
+- **Naming**: DB tables are plural snake_case (`blog_posts`, `experience_highlights`)
+  with `{table}_id` primary keys; Go entities singular (`domain.BlogPost`); DTO JSON
+  fields camelCase.
 - **IDs/timestamps**: UUIDs generated in the service layer (`uuid.New()`); DB defaults
   also exist (`gen_random_uuid()`). `updated_at` maintained in SQL (`now()`).
 
@@ -185,8 +191,8 @@ switches logger behavior), `APP_PORT` (default `:8080`), `JWT_ACCESS_TTL`/`JWT_R
   `NNNN_name.down.sql` (currently `0001_init`, `0002_profile`). `migrations/seed.sql`
   is demo data, applied manually — it is not part of the migrate sequence.
 - Schema highlights: enum types `experience_type` (`work|education`) and
-  `content_status` (`draft|published`); `post_tag` join table; `profile` is a
-  singleton enforced by `CHECK (id = 1)`; cascades on child tables.
+  `content_status` (`draft|published`); `post_tags` join table; `profiles` is a
+  singleton enforced by `CHECK (profile_id = 1)`; cascades on child tables.
 - Never edit an applied migration — add a new numbered pair instead.
 
 ## Security Considerations
@@ -194,7 +200,7 @@ switches logger behavior), `APP_PORT` (default `:8080`), `JWT_ACCESS_TTL`/`JWT_R
 - JWT is HS256 with `JWT_SECRET`; access token (default 15m) returned in the body,
   refresh token (default 7d) also set as an httpOnly, Secure, SameSite=Strict cookie
   scoped to `Path=/api/v1/auth`. Login is rate-limited (5/min/IP).
-- Admin passwords are bcrypt hashes; login compares against the `admin_user` table.
+- Admin passwords are bcrypt hashes; login compares against the `admin_users` table.
 - `middleware.Auth` is non-blocking (populates claims when a valid Bearer token exists);
   admin routes are protected by the `/admin` group's middleware chain. Keep new admin
   routes under that group.
