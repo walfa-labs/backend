@@ -26,11 +26,11 @@ func (r *StatsRepo) Summary(ctx context.Context) (port.StatsSummary, error) {
 
 	err := r.pool.QueryRow(ctx, `
 		SELECT
-			(SELECT COUNT(*) FROM blog_post WHERE status = 'published') AS published_posts,
-			(SELECT COUNT(*) FROM project WHERE status = 'published') AS published_projects,
-			(SELECT COUNT(*) FROM project WHERE featured = true AND status = 'published') AS featured_projects,
-			(SELECT COALESCE(SUM(view_count), 0) FROM blog_post) AS total_views,
-			(SELECT MIN(start_date) FROM experience WHERE experience_type = 'work') AS min_start`).Scan(
+			(SELECT COUNT(*) FROM blog_posts WHERE status = 'published') AS published_posts,
+			(SELECT COUNT(*) FROM projects WHERE status = 'published') AS published_projects,
+			(SELECT COUNT(*) FROM projects WHERE featured = true AND status = 'published') AS featured_projects,
+			(SELECT COALESCE(SUM(view_count), 0) FROM blog_posts) AS total_views,
+			(SELECT MIN(start_date) FROM experiences WHERE experience_type = 'work') AS min_start`).Scan(
 		&s.PublishedPosts, &s.PublishedProjects, &s.FeaturedProjects, &s.TotalPostViews, &minStart,
 	)
 	if err != nil {
@@ -55,7 +55,7 @@ func (r *StatsRepo) ViewsTimeSeries(ctx context.Context, from, to time.Time, buc
 
 	rows, err := r.pool.Query(ctx, fmt.Sprintf(`
 		SELECT date_trunc('%s', created_at) AS b, COALESCE(SUM(view_count), 0)
-		FROM blog_post
+		FROM blog_posts
 		WHERE created_at >= $1 AND created_at <= $2
 		GROUP BY b
 		ORDER BY b ASC`, truncFn), from, to)
@@ -81,8 +81,8 @@ func (r *StatsRepo) ViewsTimeSeries(ctx context.Context, from, to time.Time, buc
 // TopPosts returns the most-viewed published posts.
 func (r *StatsRepo) TopPosts(ctx context.Context, limit int) ([]port.TopPost, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, slug, title, view_count
-		FROM blog_post
+		SELECT blog_post_id, slug, title, view_count
+		FROM blog_posts
 		WHERE status = 'published'
 		ORDER BY view_count DESC
 		LIMIT $1`, limit)

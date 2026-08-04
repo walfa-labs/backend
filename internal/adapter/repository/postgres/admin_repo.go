@@ -23,8 +23,8 @@ func NewAdminRepo(pool *pgxpool.Pool) *AdminRepo {
 func (r *AdminRepo) GetByUsername(ctx context.Context, username string) (*domain.AdminUser, error) {
 	var u domain.AdminUser
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, username, password_hash, created_at
-		FROM admin_user WHERE username = $1`, username).Scan(
+		SELECT admin_user_id, username, password_hash, created_at
+		FROM admin_users WHERE username = $1`, username).Scan(
 		&u.ID, &u.Username, &u.PasswordHash, &u.CreatedAt,
 	)
 	if err != nil {

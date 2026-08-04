@@ -22,7 +22,7 @@ func NewProjectRepo(pool *pgxpool.Pool) *ProjectRepo {
 	return &ProjectRepo{pool: pool}
 }
 
-const projectColumns = `id, slug, title, COALESCE(tagline, ''), COALESCE(description_markdown, ''), COALESCE(cover_image_url, ''),
+const projectColumns = `project_id, slug, title, COALESCE(tagline, ''), COALESCE(description_markdown, ''), COALESCE(cover_image_url, ''),
 	COALESCE(repo_url, ''), COALESCE(demo_url, ''), tech_stack, status, featured, sort_order, published_at,
 	created_at, updated_at`
 
@@ -43,7 +43,7 @@ func scanProject(row pgx.Row) (*domain.Project, error) {
 
 // ListPublished returns published projects, optionally filtered by featured.
 func (r *ProjectRepo) ListPublished(ctx context.Context, filter port.ProjectFilter) ([]domain.Project, error) {
-	q := `SELECT ` + projectColumns + ` FROM project WHERE status = 'published'`
+	q := `SELECT ` + projectColumns + ` FROM projects WHERE status = 'published'`
 	args := []interface{}{}
 	if filter.HasFeat {
 		q += ` AND featured = $1`
@@ -74,7 +74,7 @@ func (r *ProjectRepo) ListPublished(ctx context.Context, filter port.ProjectFilt
 
 // ListAll returns all projects including drafts, ordered by sort_order.
 func (r *ProjectRepo) ListAll(ctx context.Context) ([]domain.Project, error) {
-	rows, err := r.pool.Query(ctx, `SELECT `+projectColumns+` FROM project ORDER BY sort_order ASC, created_at DESC`)
+	rows, err := r.pool.Query(ctx, `SELECT `+projectColumns+` FROM projects ORDER BY sort_order ASC, created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (r *ProjectRepo) ListAll(ctx context.Context) ([]domain.Project, error) {
 
 // GetBySlug returns a single project with its links.
 func (r *ProjectRepo) GetBySlug(ctx context.Context, slug string) (*domain.Project, error) {
-	p, err := scanProject(r.pool.QueryRow(ctx, `SELECT `+projectColumns+` FROM project WHERE slug = $1`, slug))
+	p, err := scanProject(r.pool.QueryRow(ctx, `SELECT `+projectColumns+` FROM projects WHERE slug = $1`, slug))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrNotFound
@@ -113,7 +113,7 @@ func (r *ProjectRepo) GetBySlug(ctx context.Context, slug string) (*domain.Proje
 
 // GetByID returns a single project with its links.
 func (r *ProjectRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Project, error) {
-	p, err := scanProject(r.pool.QueryRow(ctx, `SELECT `+projectColumns+` FROM project WHERE id = $1`, id))
+	p, err := scanProject(r.pool.QueryRow(ctx, `SELECT `+projectColumns+` FROM projects WHERE project_id = $1`, id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrNotFound
@@ -136,11 +136,11 @@ func (r *ProjectRepo) Create(ctx context.Context, p *domain.Project) error {
 	defer tx.Rollback(ctx)
 
 	err = tx.QueryRow(ctx, `
-		INSERT INTO project
+		INSERT INTO projects
 		    (slug, title, tagline, description_markdown, cover_image_url,
 		     repo_url, demo_url, tech_stack, status, featured, sort_order, published_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-		RETURNING id, created_at, updated_at`,
+		RETURNING project_id, created_at, updated_at`,
 		p.Slug, p.Title, p.Tagline, p.DescriptionMarkdown, p.CoverImageURL,
 		p.RepoURL, p.DemoURL, p.TechStack, p.Status, p.Featured, p.SortOrder, p.PublishedAt,
 	).Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt)
@@ -163,12 +163,12 @@ func (r *ProjectRepo) Update(ctx context.Context, p *domain.Project) error {
 	defer tx.Rollback(ctx)
 
 	tag, err := tx.Exec(ctx, `
-		UPDATE project SET
+		UPDATE projects SET
 		    slug = $1, title = $2, tagline = $3, description_markdown = $4,
 		    cover_image_url = $5, repo_url = $6, demo_url = $7, tech_stack = $8,
 		    status = $9, featured = $10, sort_order = $11, published_at = $12,
 		    updated_at = now()
-		WHERE id = $13`,
+		WHERE project_id = $13`,
 		p.Slug, p.Title, p.Tagline, p.DescriptionMarkdown, p.CoverImageURL,
 		p.RepoURL, p.DemoURL, p.TechStack, p.Status, p.Featured, p.SortOrder,
 		p.PublishedAt, p.ID,
@@ -184,7 +184,7 @@ func (r *ProjectRepo) Update(ctx context.Context, p *domain.Project) error {
 		return err
 	}
 
-	if err := tx.QueryRow(ctx, `SELECT updated_at FROM project WHERE id = $1`, p.ID).Scan(&p.UpdatedAt); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT updated_at FROM projects WHERE project_id = $1`, p.ID).Scan(&p.UpdatedAt); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
@@ -192,7 +192,7 @@ func (r *ProjectRepo) Update(ctx context.Context, p *domain.Project) error {
 
 // Delete removes a project; links cascade.
 func (r *ProjectRepo) Delete(ctx context.Context, id uuid.UUID) error {
-	tag, err := r.pool.Exec(ctx, `DELETE FROM project WHERE id = $1`, id)
+	tag, err := r.pool.Exec(ctx, `DELETE FROM projects WHERE project_id = $1`, id)
 	if err != nil {
 		return err
 	}
@@ -204,10 +204,10 @@ func (r *ProjectRepo) Delete(ctx context.Context, id uuid.UUID) error {
 
 func (r *ProjectRepo) fetchLinks(ctx context.Context, projectID uuid.UUID) ([]domain.ProjectLink, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, project_id, label, url, kind
-		FROM project_link
+		SELECT project_link_id, project_id, label, url, kind
+		FROM project_links
 		WHERE project_id = $1
-		ORDER BY id ASC`, projectID)
+		ORDER BY project_link_id ASC`, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -225,12 +225,12 @@ func (r *ProjectRepo) fetchLinks(ctx context.Context, projectID uuid.UUID) ([]do
 }
 
 func (r *ProjectRepo) replaceLinks(ctx context.Context, tx pgx.Tx, projectID uuid.UUID, links []domain.ProjectLink) error {
-	if _, err := tx.Exec(ctx, `DELETE FROM project_link WHERE project_id = $1`, projectID); err != nil {
+	if _, err := tx.Exec(ctx, `DELETE FROM project_links WHERE project_id = $1`, projectID); err != nil {
 		return err
 	}
 	for _, l := range links {
 		_, err := tx.Exec(ctx, `
-			INSERT INTO project_link (project_id, label, url, kind)
+			INSERT INTO project_links (project_id, label, url, kind)
 			VALUES ($1, $2, $3, $4)`,
 			projectID, l.Label, l.URL, l.Kind)
 		if err != nil {

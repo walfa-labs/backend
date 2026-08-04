@@ -21,7 +21,7 @@ func NewTagRepo(pool *pgxpool.Pool) *TagRepo {
 
 // List returns all tags ordered by name.
 func (r *TagRepo) List(ctx context.Context) ([]domain.Tag, error) {
-	rows, err := r.pool.Query(ctx, `SELECT id, name, slug FROM tag ORDER BY name ASC`)
+	rows, err := r.pool.Query(ctx, `SELECT tag_id, name, slug FROM tags ORDER BY name ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -42,10 +42,10 @@ func (r *TagRepo) List(ctx context.Context) ([]domain.Tag, error) {
 func (r *TagRepo) GetOrCreate(ctx context.Context, name, slug string) (*domain.Tag, error) {
 	var t domain.Tag
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO tag (name, slug)
+		INSERT INTO tags (name, slug)
 		VALUES ($1, $2)
 		ON CONFLICT (slug) DO NOTHING
-		RETURNING id, name, slug`, name, slug).Scan(&t.ID, &t.Name, &t.Slug)
+		RETURNING tag_id, name, slug`, name, slug).Scan(&t.ID, &t.Name, &t.Slug)
 	if err == nil {
 		return &t, nil
 	}
@@ -53,7 +53,7 @@ func (r *TagRepo) GetOrCreate(ctx context.Context, name, slug string) (*domain.T
 		return nil, err
 	}
 	// Row was not inserted because a tag with this slug already exists.
-	err = r.pool.QueryRow(ctx, `SELECT id, name, slug FROM tag WHERE slug = $1`, slug).Scan(&t.ID, &t.Name, &t.Slug)
+	err = r.pool.QueryRow(ctx, `SELECT tag_id, name, slug FROM tags WHERE slug = $1`, slug).Scan(&t.ID, &t.Name, &t.Slug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrNotFound

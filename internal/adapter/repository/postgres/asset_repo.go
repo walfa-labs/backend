@@ -22,9 +22,9 @@ func NewAssetRepo(pool *pgxpool.Pool) *AssetRepo {
 // Create inserts asset metadata and returns the generated ID/timestamp.
 func (r *AssetRepo) Create(ctx context.Context, a *domain.Asset) error {
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO asset (key, url, content_type, size_bytes)
+		INSERT INTO assets (key, url, content_type, size_bytes)
 		VALUES ($1, $2, $3, $4)
-		RETURNING id, uploaded_at`,
+		RETURNING asset_id, uploaded_at`,
 		a.Key, a.URL, a.ContentType, a.SizeBytes,
 	).Scan(&a.ID, &a.UploadedAt)
 	return err
@@ -34,8 +34,8 @@ func (r *AssetRepo) Create(ctx context.Context, a *domain.Asset) error {
 func (r *AssetRepo) GetByKey(ctx context.Context, key string) (*domain.Asset, error) {
 	var a domain.Asset
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, key, url, content_type, size_bytes, uploaded_at
-		FROM asset WHERE key = $1`, key).Scan(
+		SELECT asset_id, key, url, content_type, size_bytes, uploaded_at
+		FROM assets WHERE key = $1`, key).Scan(
 		&a.ID, &a.Key, &a.URL, &a.ContentType, &a.SizeBytes, &a.UploadedAt,
 	)
 	if err != nil {
@@ -49,7 +49,7 @@ func (r *AssetRepo) GetByKey(ctx context.Context, key string) (*domain.Asset, er
 
 // DeleteByKey removes asset metadata by storage key.
 func (r *AssetRepo) DeleteByKey(ctx context.Context, key string) error {
-	tag, err := r.pool.Exec(ctx, `DELETE FROM asset WHERE key = $1`, key)
+	tag, err := r.pool.Exec(ctx, `DELETE FROM assets WHERE key = $1`, key)
 	if err != nil {
 		return err
 	}
