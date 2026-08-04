@@ -37,29 +37,38 @@ migrations/              → golang-migrate SQL files
 
 ## Quick Start
 
+Prerequisites: Go 1.26+, [Task](https://taskfile.dev), and **already-running infrastructure** — this project does not deploy anything itself. You need:
+
+- a PostgreSQL 16+ database you can reach (local install, home server, managed — anything),
+- an S3-compatible bucket (MinIO, R2, S3) that already exists,
+- `psql` and the `golang-migrate` CLI for the DB tasks (`task tools` installs the latter).
+
+All connection details live in `.env`:
+
 ```bash
-# Copy env template
+# Copy the env template, then edit it to point at your infra:
+# DATABASE_URL, OBJECT_STORAGE_ENDPOINT/BUCKET/ACCESS_KEY/SECRET_KEY,
+# JWT_SECRET, ADMIN_PASSWORD_HASH, ... (see .env.example for everything)
 cp .env.example .env
 
-# Start local infra (Postgres 16 + MinIO)
-docker run -d --name portfolio-postgres -e POSTGRES_USER=portfolio -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=portfolio -p 5432:5432 postgres:16-alpine
-docker run -d --name portfolio-minio -e MINIO_ROOT_USER=minio -e MINIO_ROOT_PASSWORD=minio123 -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address :9001
+# Install dev tools used below (air + golang-migrate CLI)
+task tools
 
-# Run database migrations
-migrate -path migrations -database "$DATABASE_URL" up
+# Apply database migrations, then optionally load demo data
+task migrate-up
+task seed
 
-# Seed a local admin user (password: admin123) — login reads the admin_user
-# table, not ADMIN_PASSWORD_HASH; generate your own hash for anything real.
-docker exec portfolio-postgres psql -U portfolio -c \
-  "INSERT INTO admin_user (username, password_hash) VALUES ('admin', '<bcrypt-hash-of-admin123>');"
+# Create an admin user — login reads the admin_user table, not
+# ADMIN_PASSWORD_HASH; generate your own bcrypt hash for anything real.
+psql "$DATABASE_URL" -c \
+  "INSERT INTO admin_user (username, password_hash) VALUES ('admin', '<bcrypt-hash>');"
 
-# Create the asset bucket
-docker run --rm --network host --entrypoint /bin/sh minio/mc -c \
-  "mc alias set local http://localhost:9000 minio minio123 && mc mb -p local/portfolio-assets"
-
-# Start the server (the process does NOT auto-load .env — source it first)
-set -a; . ./.env; set +a && go run ./cmd/api    # serves :8080
+# Start the server on :8080 (Task loads .env automatically)
+task run
 ```
+
+Without Task, the equivalent is to export the variables yourself:
+`set -a; . ./.env; set +a && go run ./cmd/api`
 
 ## API Endpoints
 
@@ -120,9 +129,16 @@ See `.env.example` for all environment variables.
 
 ## Development
 
+Everything goes through the Taskfile (`task --list` to see all tasks):
+
 ```bash
-go mod tidy
-go run ./cmd/api
-go test ./...
-go vet ./...
+task run          # start the server (loads .env)
+task dev          # hot reload via air
+task build        # build the binary to bin/
+task test         # go test ./...
+task vet          # go vet ./...
+task tidy         # go mod tidy
+task migrate-up   # apply migrations (DATABASE_URL from .env)
+task migrate-down # roll back migrations
+task seed         # load demo data
 ```
