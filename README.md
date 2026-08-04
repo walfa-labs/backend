@@ -15,6 +15,7 @@ Go (Fiber v3) backend API for a personal portfolio with dynamic content — expe
 | Auth | [golang-jwt/v5](https://github.com/golang-jwt/jwt) |
 | Object storage | [minio-go/v7](https://github.com/minio/minio-go) (S3-compatible) |
 | Config | [caarlos0/env](https://github.com/caarlos0/env) |
+| API docs | [contrib/swaggerui](https://github.com/gofiber/contrib) (Swagger UI + OpenAPI 3) |
 
 ## Architecture
 
@@ -58,10 +59,10 @@ task tools
 task migrate-up
 task seed
 
-# Create an admin user — login reads the admin_user table, not
+# Create an admin user — login reads the admin_users table, not
 # ADMIN_PASSWORD_HASH; generate your own bcrypt hash for anything real.
 psql "$DATABASE_URL" -c \
-  "INSERT INTO admin_user (username, password_hash) VALUES ('admin', '<bcrypt-hash>');"
+  "INSERT INTO admin_users (username, password_hash) VALUES ('admin', '<bcrypt-hash>');"
 
 # Start the server on :8080 (Task loads .env automatically)
 task run
@@ -71,6 +72,10 @@ Without Task, the equivalent is to export the variables yourself:
 `set -a; . ./.env; set +a && go run ./cmd/api`
 
 ## API Endpoints
+
+Interactive docs: **Swagger UI at `/swagger`** (public, no auth). The OpenAPI 3 spec
+lives at `docs/openapi.yaml` and is served at `/docs/openapi.yaml` — it is read from
+disk at startup, so run the binary from the repo root.
 
 ### Public (read-only, cached)
 ```

@@ -38,7 +38,7 @@ func scanProfile(row pgx.Row) (*domain.Profile, error) {
 // zero-value Profile with empty strings (NOT ErrNotFound) so callers can
 // serve a 200 with empty fields.
 func (r *ProfileRepo) Get(ctx context.Context) (*domain.Profile, error) {
-	p, err := scanProfile(r.pool.QueryRow(ctx, `SELECT `+profileColumns+` FROM profile WHERE id = 1`))
+	p, err := scanProfile(r.pool.QueryRow(ctx, `SELECT `+profileColumns+` FROM profiles WHERE profile_id = 1`))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return &domain.Profile{}, nil
@@ -51,10 +51,10 @@ func (r *ProfileRepo) Get(ctx context.Context) (*domain.Profile, error) {
 // Upsert creates or updates the singleton profile row, returning the result.
 func (r *ProfileRepo) Upsert(ctx context.Context, p *domain.Profile) error {
 	return r.pool.QueryRow(ctx, `
-		INSERT INTO profile (id, name, email, tagline, bio_markdown, location,
+		INSERT INTO profiles (profile_id, name, email, tagline, bio_markdown, location,
 		    avatar_url, github_url, linkedin_url, twitter_url)
 		VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9)
-		ON CONFLICT (id) DO UPDATE SET
+		ON CONFLICT (profile_id) DO UPDATE SET
 		    name = EXCLUDED.name,
 		    email = EXCLUDED.email,
 		    tagline = EXCLUDED.tagline,

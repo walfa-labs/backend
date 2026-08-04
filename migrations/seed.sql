@@ -1,20 +1,21 @@
 -- Experiences
-INSERT INTO experience (experience_type, organization, role_title, location, start_date, end_date, current, summary_markdown, sort_order) VALUES
+INSERT INTO experiences (experience_type, organization, role_title, location, start_date, end_date, current, summary_markdown, sort_order) VALUES
+  ('work', 'Google', 'Senior Software Engineer', 'Singapore', '2022-01-01', NULL, true, 'Building distributed backend systems and leading backend architecture initiatives.', 0),
   ('work', 'Stripe', 'Software Engineer II', 'Remote', '2019-06-01', '2021-12-31', false, 'Worked on payment infrastructure processing billions of dollars in transactions.', 1),
   ('work', 'Vercel', 'Software Engineer Intern', 'Remote', '2018-05-01', '2018-08-31', false, 'Contributed to the Next.js framework and internal tooling.', 2),
-  ('education', 'National University of Singapore', 'B.Sc. Computer Science', 'Singapore', '2015-08-01', '2019-05-31', false, 'First Class Honours. Focus on distributed systems and compilers.', 0);
+  ('education', 'National University of Singapore', 'B.Sc. Computer Science', 'Singapore', '2015-08-01', '2019-05-31', false, 'First Class Honours. Focus on distributed systems and compilers.', 3);
 
-INSERT INTO experience_highlight (experience_id, body_markdown, sort_order)
+INSERT INTO experience_highlights (experience_id, body_markdown, sort_order)
 SELECT id, body, ord FROM (VALUES
-  ((SELECT id FROM experience WHERE organization='Google' AND role_title='Senior Software Engineer'), 'Led migration of monolithic PHP backend to Go microservices, reducing p99 latency by 40%', 0),
-  ((SELECT id FROM experience WHERE organization='Google' AND role_title='Senior Software Engineer'), 'Designed and implemented a real-time analytics pipeline processing 10M+ events/day', 1),
-  ((SELECT id FROM experience WHERE organization='Google' AND role_title='Senior Software Engineer'), 'Mentored 3 junior engineers and drove adoption of TDD across the team', 2),
-  ((SELECT id FROM experience WHERE organization='Stripe' AND role_title='Software Engineer II'), 'Redesigned the dispute resolution API used by 50k+ businesses', 0),
-  ((SELECT id FROM experience WHERE organization='Stripe' AND role_title='Software Engineer II'), 'Improved payment retry logic, recovering $2M+ in failed transactions annually', 1)
+  ((SELECT experience_id FROM experiences WHERE organization='Google' AND role_title='Senior Software Engineer'), 'Led migration of monolithic PHP backend to Go microservices, reducing p99 latency by 40%', 0),
+  ((SELECT experience_id FROM experiences WHERE organization='Google' AND role_title='Senior Software Engineer'), 'Designed and implemented a real-time analytics pipeline processing 10M+ events/day', 1),
+  ((SELECT experience_id FROM experiences WHERE organization='Google' AND role_title='Senior Software Engineer'), 'Mentored 3 junior engineers and drove adoption of TDD across the team', 2),
+  ((SELECT experience_id FROM experiences WHERE organization='Stripe' AND role_title='Software Engineer II'), 'Redesigned the dispute resolution API used by 50k+ businesses', 0),
+  ((SELECT experience_id FROM experiences WHERE organization='Stripe' AND role_title='Software Engineer II'), 'Improved payment retry logic, recovering $2M+ in failed transactions annually', 1)
 ) AS t(id, body, ord);
 
 -- Projects
-INSERT INTO project (slug, title, tagline, description_markdown, repo_url, demo_url, tech_stack, status, featured, sort_order, published_at) VALUES
+INSERT INTO projects (slug, title, tagline, description_markdown, repo_url, demo_url, tech_stack, status, featured, sort_order, published_at) VALUES
   ('realtime-chat-go', 'Realtime Chat Engine', 'A WebSocket-based chat platform built in Go with 10k concurrent connections.', '## Overview
 
 A high-performance realtime chat engine built in Go, using WebSocket connections and Redis pub/sub for message distribution.
@@ -69,16 +70,16 @@ A GraphQL gateway that aggregates data from multiple REST APIs into a single uni
 - Rate limiting per client', 'https://github.com/walfa/graphql-mesh-gateway', '', ARRAY['Go', 'GraphQL', 'gqlgen', 'Redis'], 'published', false, 4, now());
 
 -- Project links
-INSERT INTO project_link (project_id, label, url, kind) VALUES
-  ((SELECT id FROM project WHERE slug='realtime-chat-go'), 'GitHub', 'https://github.com/walfa/realtime-chat-go', 'repo'),
-  ((SELECT id FROM project WHERE slug='realtime-chat-go'), 'Live Demo', 'https://chat-demo.walfa.dev', 'demo'),
-  ((SELECT id FROM project WHERE slug='nuxt-portfolio-cms'), 'GitHub', 'https://github.com/walfa/nuxt-portfolio-cms', 'repo'),
-  ((SELECT id FROM project WHERE slug='url-shortener-rust'), 'GitHub', 'https://github.com/walfa/url-shortener-rust', 'repo'),
-  ((SELECT id FROM project WHERE slug='url-shortener-rust'), 'Live Demo', 'https://s.walfa.dev', 'demo'),
-  ((SELECT id FROM project WHERE slug='cli-task-manager'), 'GitHub', 'https://github.com/walfa/cli-task-manager', 'repo');
+INSERT INTO project_links (project_id, label, url, kind) VALUES
+  ((SELECT project_id FROM projects WHERE slug='realtime-chat-go'), 'GitHub', 'https://github.com/walfa/realtime-chat-go', 'repo'),
+  ((SELECT project_id FROM projects WHERE slug='realtime-chat-go'), 'Live Demo', 'https://chat-demo.walfa.dev', 'demo'),
+  ((SELECT project_id FROM projects WHERE slug='nuxt-portfolio-cms'), 'GitHub', 'https://github.com/walfa/nuxt-portfolio-cms', 'repo'),
+  ((SELECT project_id FROM projects WHERE slug='url-shortener-rust'), 'GitHub', 'https://github.com/walfa/url-shortener-rust', 'repo'),
+  ((SELECT project_id FROM projects WHERE slug='url-shortener-rust'), 'Live Demo', 'https://s.walfa.dev', 'demo'),
+  ((SELECT project_id FROM projects WHERE slug='cli-task-manager'), 'GitHub', 'https://github.com/walfa/cli-task-manager', 'repo');
 
 -- Blog posts
-INSERT INTO blog_post (slug, title, excerpt, body_markdown, status, view_count, published_at) VALUES
+INSERT INTO blog_posts (slug, title, excerpt, body_markdown, status, view_count, published_at) VALUES
   ('building-realtime-chat-go-websockets', 'Building a Realtime Chat in Go with WebSockets', 'A deep dive into building a production-grade WebSocket chat server in Go, covering connection pooling, Redis pub/sub, and horizontal scaling.', '# Building a Realtime Chat in Go
 
 When I set out to build a chat system that could handle **10,000 concurrent connections**, I knew Go was the right choice.
@@ -218,7 +219,7 @@ Result: **15MB** image with zero attack surface.
 | CVEs | 47 | 0 |', 'published', 1876, now() - interval '45 days');
 
 -- Tags
-INSERT INTO tag (name, slug) VALUES
+INSERT INTO tags (name, slug) VALUES
   ('Go', 'go'),
   ('WebSockets', 'websockets'),
   ('Redis', 'redis'),
@@ -231,14 +232,14 @@ INSERT INTO tag (name, slug) VALUES
   ('DevOps', 'devops');
 
 -- Post-tag associations
-INSERT INTO post_tag (post_id, tag_id) SELECT p.id, t.id FROM blog_post p, tag t WHERE p.slug='building-realtime-chat-go-websockets' AND t.slug IN ('go', 'websockets', 'redis', 'performance');
-INSERT INTO post_tag (post_id, tag_id) SELECT p.id, t.id FROM blog_post p, tag t WHERE p.slug='why-i-chose-go-for-backend' AND t.slug IN ('go', 'typescript', 'performance');
-INSERT INTO post_tag (post_id, tag_id) SELECT p.id, t.id FROM blog_post p, tag t WHERE p.slug='postgres-indexing-strategies' AND t.slug IN ('postgresql', 'performance');
-INSERT INTO post_tag (post_id, tag_id) SELECT p.id, t.id FROM blog_post p, tag t WHERE p.slug='terminal-ui-design-principles' AND t.slug IN ('go', 'performance');
-INSERT INTO post_tag (post_id, tag_id) SELECT p.id, t.id FROM blog_post p, tag t WHERE p.slug='docker-multi-stage-builds-go' AND t.slug IN ('go', 'docker', 'devops');
+INSERT INTO post_tags (blog_post_id, tag_id) SELECT p.blog_post_id, t.tag_id FROM blog_posts p, tags t WHERE p.slug='building-realtime-chat-go-websockets' AND t.slug IN ('go', 'websockets', 'redis', 'performance');
+INSERT INTO post_tags (blog_post_id, tag_id) SELECT p.blog_post_id, t.tag_id FROM blog_posts p, tags t WHERE p.slug='why-i-chose-go-for-backend' AND t.slug IN ('go', 'typescript', 'performance');
+INSERT INTO post_tags (blog_post_id, tag_id) SELECT p.blog_post_id, t.tag_id FROM blog_posts p, tags t WHERE p.slug='postgres-indexing-strategies' AND t.slug IN ('postgresql', 'performance');
+INSERT INTO post_tags (blog_post_id, tag_id) SELECT p.blog_post_id, t.tag_id FROM blog_posts p, tags t WHERE p.slug='terminal-ui-design-principles' AND t.slug IN ('go', 'performance');
+INSERT INTO post_tags (blog_post_id, tag_id) SELECT p.blog_post_id, t.tag_id FROM blog_posts p, tags t WHERE p.slug='docker-multi-stage-builds-go' AND t.slug IN ('go', 'docker', 'devops');
 
 -- Update profile
-UPDATE profile SET
+UPDATE profiles SET
   name = 'Walfa',
   email = 'hello@walfa.dev',
   tagline = 'Software engineer building fast, reliable systems with Go and TypeScript.',
@@ -252,4 +253,4 @@ When I am not coding, you can find me contributing to open source, writing about
   linkedin_url = 'https://linkedin.com/in/walfa',
   twitter_url = 'https://twitter.com/walfa',
   updated_at = now()
-WHERE id = 1;
+WHERE profile_id = 1;

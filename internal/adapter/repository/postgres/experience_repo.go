@@ -24,10 +24,10 @@ func NewExperienceRepo(pool *pgxpool.Pool) *ExperienceRepo {
 // List returns all experiences ordered by sort_order.
 func (r *ExperienceRepo) List(ctx context.Context) ([]domain.Experience, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, experience_type, organization, role_title, location,
+		SELECT experience_id, experience_type, organization, role_title, location,
 		       start_date, end_date, current, summary_markdown, sort_order,
 		       created_at, updated_at
-		FROM experience
+		FROM experiences
 		ORDER BY sort_order ASC, start_date DESC`)
 	if err != nil {
 		return nil, err
@@ -56,11 +56,11 @@ func (r *ExperienceRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Exp
 	var e domain.Experience
 	var endDate *time.Time
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, experience_type, organization, role_title, location,
+		SELECT experience_id, experience_type, organization, role_title, location,
 		       start_date, end_date, current, summary_markdown, sort_order,
 		       created_at, updated_at
-		FROM experience
-		WHERE id = $1`, id).Scan(
+		FROM experiences
+		WHERE experience_id = $1`, id).Scan(
 		&e.ID, &e.ExperienceType, &e.Organization, &e.RoleTitle, &e.Location,
 		&e.StartDate, &endDate, &e.Current, &e.SummaryMarkdown, &e.SortOrder,
 		&e.CreatedAt, &e.UpdatedAt,
@@ -90,11 +90,11 @@ func (r *ExperienceRepo) Create(ctx context.Context, e *domain.Experience) error
 	defer tx.Rollback(ctx)
 
 	err = tx.QueryRow(ctx, `
-		INSERT INTO experience
+		INSERT INTO experiences
 		    (experience_type, organization, role_title, location, start_date,
 		     end_date, current, summary_markdown, sort_order)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		RETURNING id, created_at, updated_at`,
+		RETURNING experience_id, created_at, updated_at`,
 		e.ExperienceType, e.Organization, e.RoleTitle, e.Location, e.StartDate,
 		e.EndDate, e.Current, e.SummaryMarkdown, e.SortOrder,
 	).Scan(&e.ID, &e.CreatedAt, &e.UpdatedAt)
@@ -117,11 +117,11 @@ func (r *ExperienceRepo) Update(ctx context.Context, e *domain.Experience) error
 	defer tx.Rollback(ctx)
 
 	tag, err := tx.Exec(ctx, `
-		UPDATE experience SET
+		UPDATE experiences SET
 		    experience_type = $1, organization = $2, role_title = $3,
 		    location = $4, start_date = $5, end_date = $6, current = $7,
 		    summary_markdown = $8, sort_order = $9, updated_at = now()
-		WHERE id = $10`,
+		WHERE experience_id = $10`,
 		e.ExperienceType, e.Organization, e.RoleTitle, e.Location, e.StartDate,
 		e.EndDate, e.Current, e.SummaryMarkdown, e.SortOrder, e.ID,
 	)
@@ -136,7 +136,7 @@ func (r *ExperienceRepo) Update(ctx context.Context, e *domain.Experience) error
 		return err
 	}
 
-	if err := tx.QueryRow(ctx, `SELECT updated_at FROM experience WHERE id = $1`, e.ID).Scan(&e.UpdatedAt); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT updated_at FROM experiences WHERE experience_id = $1`, e.ID).Scan(&e.UpdatedAt); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
@@ -144,7 +144,7 @@ func (r *ExperienceRepo) Update(ctx context.Context, e *domain.Experience) error
 
 // Delete removes an experience; highlights cascade.
 func (r *ExperienceRepo) Delete(ctx context.Context, id uuid.UUID) error {
-	tag, err := r.pool.Exec(ctx, `DELETE FROM experience WHERE id = $1`, id)
+	tag, err := r.pool.Exec(ctx, `DELETE FROM experiences WHERE experience_id = $1`, id)
 	if err != nil {
 		return err
 	}
@@ -156,8 +156,8 @@ func (r *ExperienceRepo) Delete(ctx context.Context, id uuid.UUID) error {
 
 func (r *ExperienceRepo) fetchHighlights(ctx context.Context, experienceID uuid.UUID) ([]domain.ExperienceHighlight, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, experience_id, body_markdown, sort_order
-		FROM experience_highlight
+		SELECT experience_highlight_id, experience_id, body_markdown, sort_order
+		FROM experience_highlights
 		WHERE experience_id = $1
 		ORDER BY sort_order ASC`, experienceID)
 	if err != nil {
@@ -177,12 +177,12 @@ func (r *ExperienceRepo) fetchHighlights(ctx context.Context, experienceID uuid.
 }
 
 func (r *ExperienceRepo) replaceHighlights(ctx context.Context, tx pgx.Tx, experienceID uuid.UUID, highlights []domain.ExperienceHighlight) error {
-	if _, err := tx.Exec(ctx, `DELETE FROM experience_highlight WHERE experience_id = $1`, experienceID); err != nil {
+	if _, err := tx.Exec(ctx, `DELETE FROM experience_highlights WHERE experience_id = $1`, experienceID); err != nil {
 		return err
 	}
 	for _, h := range highlights {
 		_, err := tx.Exec(ctx, `
-			INSERT INTO experience_highlight (experience_id, body_markdown, sort_order)
+			INSERT INTO experience_highlights (experience_id, body_markdown, sort_order)
 			VALUES ($1, $2, $3)`,
 			experienceID, h.BodyMarkdown, h.SortOrder)
 		if err != nil {

@@ -1,0 +1,1516 @@
+openapi: 3.0.3
+
+info:
+  title: Portfolio API
+  version: 1.0.0
+  description: |
+    REST API powering a personal portfolio site: experiences, projects, blog posts,
+    tags, stats, a singleton profile, and image assets.
+
+    ## Envelopes
+
+    - Success: `{"data": ...}` or `{"data": [...], "meta": {"page": 1, "perPage": 10, "total": 42}}`
+    - Error: `{"error": {"code": "...", "message": "...", "details"?: [...], "request_id": "..."}}`
+
+    Error codes: `NOT_FOUND` (404), `CONFLICT` (409), `VALIDATION_FAILED` (400),
+    `UNAUTHORIZED` (401), `FORBIDDEN` (403), `INTERNAL_ERROR` (500).
+
+    ## Authentication
+
+    All `/api/v1/admin/*` endpoints require a Bearer access token (JWT, HS256).
+    Obtain one via `POST /api/v1/auth/login`; renew it via `POST /api/v1/auth/refresh`.
+    Login also sets a `refresh_token` httpOnly cookie scoped to `Path=/api/v1/auth`.
+
+    ## Conventions
+
+    - JSON field names are camelCase.
+    - Dates in requests are `YYYY-MM-DD`; timestamps in responses are RFC3339.
+    - IDs are UUIDs.
+    - Public read endpoints send cache headers (`Cache-Control: public, ...`, some with `ETag`).
+
+servers:
+  - url: /
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: health
+    description: Liveness probe
+  - name: auth
+    description: Admin authentication (JWT)
+  - name: experiences
+    description: Work / education history
+  - name: projects
+    description: Portfolio projects
+  - name: blog
+    description: Blog posts
+  - name: tags
+    description: Blog tags
+  - name: stats
+    description: Content and view statistics
+  - name: profile
+    description: Singleton profile
+  - name: assets
+    description: Image assets (S3-backed)
+
+paths:
+  /api/v1/health:
+    get:
+      tags: [health]
+      summary: Health check
+      description: Reports service status; `degraded` when the database is unreachable. No envelope.
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Service status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+
+  /api/v1/experiences:
+    get:
+      tags: [experiences]
+      summary: List experiences
+      operationId: listExperiences
+      security: []
+      responses:
+        '200':
+          description: All experiences with their highlights.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExperienceListEnvelope'
+
+  /api/v1/experiences/{id}:
+    get:
+      tags: [experiences]
+      summary: Get an experience
+      operationId: getExperience
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: The experience.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExperienceEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/projects:
+    get:
+      tags: [projects]
+      summary: List published projects
+      operationId: listProjects
+      security: []
+      parameters:
+        - name: featured
+          in: query
+          description: Filter by featured flag (`1` or `true` for featured only).
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Published projects.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectListEnvelope'
+
+  /api/v1/projects/{slug}:
+    get:
+      tags: [projects]
+      summary: Get a published project by slug
+      operationId: getProjectBySlug
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/SlugParam'
+      responses:
+        '200':
+          description: The project.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/blog/posts:
+    get:
+      tags: [blog]
+      summary: List published blog posts (paginated)
+      operationId: listPosts
+      security: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number (default 1).
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: perPage
+          in: query
+          description: Items per page (default 10, max 100).
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+        - name: tag
+          in: query
+          description: Filter by tag slug.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Published post summaries plus pagination meta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostPageEnvelope'
+
+  /api/v1/blog/posts/{slug}:
+    get:
+      tags: [blog]
+      summary: Get a published blog post by slug
+      description: Sends `ETag` and cache headers; honors `If-None-Match` with 304.
+      operationId: getPostBySlug
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/SlugParam'
+        - name: If-None-Match
+          in: header
+          description: Return 304 when the ETag still matches.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The post.
+          headers:
+            ETag:
+              description: Entity tag for conditional requests.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostEnvelope'
+        '304':
+          description: Not modified (ETag matched).
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/tags:
+    get:
+      tags: [tags]
+      summary: List all tags
+      operationId: listTags
+      security: []
+      responses:
+        '200':
+          description: All tags.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagListEnvelope'
+
+  /api/v1/stats/summary:
+    get:
+      tags: [stats]
+      summary: Public stats summary
+      operationId: getStatsSummary
+      security: []
+      responses:
+        '200':
+          description: Aggregate counters for the public site.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsSummaryEnvelope'
+
+  /api/v1/profile:
+    get:
+      tags: [profile]
+      summary: Get the public profile
+      operationId: getProfile
+      security: []
+      responses:
+        '200':
+          description: The singleton profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileEnvelope'
+
+  /api/v1/assets/{key}:
+    get:
+      tags: [assets]
+      summary: Redirect to a presigned asset URL
+      description: Looks up the asset key (may contain slashes, e.g. `images/<uuid>.png`)
+        and 302-redirects to a presigned S3 URL (1 h expiry).
+      operationId: redirectAsset
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/AssetKeyParam'
+      responses:
+        '302':
+          description: Redirect to the presigned URL.
+          headers:
+            Location:
+              description: Presigned URL of the asset.
+              schema:
+                type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Log in (admin)
+      description: |
+        Authenticates against the `admin_users` table and returns an access token
+        (default TTL 15 m) plus a refresh token. The refresh token is also set as a
+        `refresh_token` httpOnly, Secure, SameSite=Strict cookie scoped to
+        `Path=/api/v1/auth`.
+
+        **Rate limited:** 5 requests/minute per IP (429 beyond that).
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Tokens; the refresh token is also set as an httpOnly cookie.
+          headers:
+            Set-Cookie:
+              description: '`refresh_token=<jwt>; Path=/api/v1/auth; HttpOnly; Secure; SameSite=Strict`'
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          description: Rate limit exceeded (5 requests/minute per IP).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [auth]
+      summary: Refresh an access token
+      description: Reads the refresh token from the `refresh_token` httpOnly cookie
+        first; falls back to the JSON body when the cookie is absent.
+      operationId: refreshToken
+      security: []
+      parameters:
+        - name: Cookie
+          in: header
+          description: '`refresh_token=<jwt>` (preferred token source).'
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: A fresh access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/admin/experiences:
+    get:
+      tags: [experiences]
+      summary: '[admin] List experiences'
+      operationId: adminListExperiences
+      responses:
+        '200':
+          description: All experiences with their highlights.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExperienceListEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [experiences]
+      summary: '[admin] Create an experience'
+      operationId: createExperience
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExperienceRequest'
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Location:
+              description: URL of the created resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExperienceEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/admin/experiences/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [experiences]
+      summary: '[admin] Get an experience'
+      operationId: adminGetExperience
+      responses:
+        '200':
+          description: The experience.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExperienceEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [experiences]
+      summary: '[admin] Replace an experience'
+      operationId: updateExperiencePut
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExperienceRequest'
+      responses:
+        '200':
+          description: Updated experience.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExperienceEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [experiences]
+      summary: '[admin] Update an experience'
+      description: Same handler as PUT — send the full representation.
+      operationId: updateExperiencePatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExperienceRequest'
+      responses:
+        '200':
+          description: Updated experience.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExperienceEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [experiences]
+      summary: '[admin] Delete an experience'
+      operationId: deleteExperience
+      responses:
+        '204':
+          description: Deleted.
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/admin/projects:
+    get:
+      tags: [projects]
+      summary: '[admin] List all projects (incl. drafts)'
+      operationId: adminListProjects
+      responses:
+        '200':
+          description: All projects.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectListEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [projects]
+      summary: '[admin] Create a project'
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectRequest'
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Location:
+              description: URL of the created resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/v1/admin/projects/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [projects]
+      summary: '[admin] Get a project'
+      operationId: adminGetProject
+      responses:
+        '200':
+          description: The project.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [projects]
+      summary: '[admin] Replace a project'
+      operationId: updateProjectPut
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectRequest'
+      responses:
+        '200':
+          description: Updated project.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    patch:
+      tags: [projects]
+      summary: '[admin] Update a project'
+      description: Same handler as PUT — send the full representation.
+      operationId: updateProjectPatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectRequest'
+      responses:
+        '200':
+          description: Updated project.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [projects]
+      summary: '[admin] Delete a project'
+      operationId: deleteProject
+      responses:
+        '204':
+          description: Deleted.
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/admin/blog/posts:
+    get:
+      tags: [blog]
+      summary: '[admin] List all blog posts (incl. drafts)'
+      operationId: adminListPosts
+      responses:
+        '200':
+          description: All posts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostListEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [blog]
+      summary: '[admin] Create a blog post'
+      operationId: createPost
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Location:
+              description: URL of the created resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/v1/admin/blog/posts/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [blog]
+      summary: '[admin] Get a blog post'
+      operationId: adminGetPost
+      responses:
+        '200':
+          description: The post.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [blog]
+      summary: '[admin] Replace a blog post'
+      operationId: updatePostPut
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+      responses:
+        '200':
+          description: Updated post.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    patch:
+      tags: [blog]
+      summary: '[admin] Update a blog post'
+      description: Same handler as PUT — send the full representation.
+      operationId: updatePostPatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+      responses:
+        '200':
+          description: Updated post.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [blog]
+      summary: '[admin] Delete a blog post'
+      operationId: deletePost
+      responses:
+        '204':
+          description: Deleted.
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/admin/blog/posts/{id}/status:
+    patch:
+      tags: [blog]
+      summary: '[admin] Set post status'
+      description: Publishes a draft (stamps `publishedAt`) or unpublishes a post.
+      operationId: setPostStatus
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetStatusRequest'
+      responses:
+        '200':
+          description: Updated post.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/admin/assets:
+    post:
+      tags: [assets]
+      summary: '[admin] Upload an image asset'
+      description: Multipart upload of a single image. Allowed content types —
+        jpeg, png, gif, webp, avif, svg. Max size 10 MB.
+      operationId: uploadAsset
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file (jpeg/png/gif/webp/avif/svg), max 10 MB.
+      responses:
+        '201':
+          description: Uploaded.
+          headers:
+            Location:
+              description: URL of the created asset.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/admin/assets/{key}:
+    delete:
+      tags: [assets]
+      summary: '[admin] Delete an asset'
+      description: The key may contain slashes (e.g. `images/<uuid>.png`).
+      operationId: deleteAsset
+      parameters:
+        - $ref: '#/components/parameters/AssetKeyParam'
+      responses:
+        '204':
+          description: Deleted.
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/admin/stats/views:
+    get:
+      tags: [stats]
+      summary: '[admin] Post views time series'
+      description: Cumulative view counts bucketed over the `[from, to]` range
+        (defaults to the last month).
+      operationId: getViewsTimeSeries
+      parameters:
+        - name: from
+          in: query
+          description: Range start, RFC3339 (default 1 month ago).
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Range end, RFC3339 (default now).
+          schema:
+            type: string
+            format: date-time
+        - name: bucket
+          in: query
+          description: Bucket size (default `day`).
+          schema:
+            type: string
+            enum: [hour, day, week, month, year]
+            default: day
+      responses:
+        '200':
+          description: Time-ordered buckets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ViewsEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/admin/stats/top-posts:
+    get:
+      tags: [stats]
+      summary: '[admin] Top posts by views'
+      operationId: getTopPosts
+      parameters:
+        - name: limit
+          in: query
+          description: Max posts to return (default 10, max 100).
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Posts ordered by view count.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopPostsEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/admin/profile:
+    get:
+      tags: [profile]
+      summary: '[admin] Get the profile'
+      operationId: adminGetProfile
+      responses:
+        '200':
+          description: The singleton profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [profile]
+      summary: '[admin] Upsert the profile'
+      description: Creates the singleton profile on first call, updates it afterwards.
+      operationId: upsertProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileRequest'
+      responses:
+        '200':
+          description: Upserted profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from `POST /api/v1/auth/login` (HS256, default TTL 15 m).
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      description: Resource UUID.
+      schema:
+        type: string
+        format: uuid
+    SlugParam:
+      name: slug
+      in: path
+      required: true
+      description: URL slug.
+      schema:
+        type: string
+    AssetKeyParam:
+      name: key
+      in: path
+      required: true
+      description: Asset key; may contain slashes (e.g. `images/<uuid>.png`).
+      schema:
+        type: string
+
+  responses:
+    ValidationFailed:
+      description: Validation failed — invalid JSON body, missing/invalid fields, or invalid UUID path param.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: VALIDATION_FAILED
+              message: validation failed
+              details:
+                - field: title
+                  issue: title is a required field
+              request_id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+    Unauthorized:
+      description: Missing, expired, or invalid credentials/token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: authentication required or failed
+              request_id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: NOT_FOUND
+              message: resource not found
+              request_id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+    Conflict:
+      description: Conflict with an existing resource (e.g. duplicate slug).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: CONFLICT
+              message: conflict with existing resource
+              request_id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+
+  schemas:
+    # --- Shared / envelope pieces ---
+    Meta:
+      type: object
+      properties:
+        page:
+          type: integer
+        perPage:
+          type: integer
+        total:
+          type: integer
+          format: int64
+    FieldError:
+      type: object
+      properties:
+        field:
+          type: string
+        issue:
+          type: string
+    ErrorBody:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [NOT_FOUND, CONFLICT, VALIDATION_FAILED, UNAUTHORIZED, FORBIDDEN, INTERNAL_ERROR]
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+        request_id:
+          type: string
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorBody'
+
+    # --- Health ---
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        db:
+          type: string
+          enum: [up, down]
+
+    # --- Experience ---
+    Highlight:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        bodyMarkdown:
+          type: string
+        sortOrder:
+          type: integer
+    Experience:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        experienceType:
+          $ref: '#/components/schemas/ExperienceType'
+        organization:
+          type: string
+        roleTitle:
+          type: string
+        location:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+          nullable: true
+        current:
+          type: boolean
+        summaryMarkdown:
+          type: string
+        sortOrder:
+          type: integer
+        highlights:
+          type: array
+          items:
+            $ref: '#/components/schemas/Highlight'
+    HighlightRequest:
+      type: object
+      properties:
+        bodyMarkdown:
+          type: string
+        sortOrder:
+          type: integer
+    ExperienceRequest:
+      type: object
+      required: [experienceType, organization, roleTitle, startDate]
+      properties:
+        experienceType:
+          $ref: '#/components/schemas/ExperienceType'
+        organization:
+          type: string
+        roleTitle:
+          type: string
+        location:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+          nullable: true
+        current:
+          type: boolean
+        summaryMarkdown:
+          type: string
+        sortOrder:
+          type: integer
+        highlights:
+          type: array
+          items:
+            $ref: '#/components/schemas/HighlightRequest'
+    ExperienceType:
+      type: string
+      enum: [work, education]
+    ContentStatus:
+      type: string
+      enum: [draft, published]
+
+    # --- Project ---
+    ProjectLink:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        url:
+          type: string
+        kind:
+          type: string
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        title:
+          type: string
+        tagline:
+          type: string
+        descriptionMarkdown:
+          type: string
+        coverImageUrl:
+          type: string
+        repoUrl:
+          type: string
+        demoUrl:
+          type: string
+        techStack:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: '#/components/schemas/ContentStatus'
+        featured:
+          type: boolean
+        sortOrder:
+          type: integer
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectLink'
+    LinkRequest:
+      type: object
+      properties:
+        label:
+          type: string
+        url:
+          type: string
+        kind:
+          type: string
+    ProjectRequest:
+      type: object
+      required: [slug, title]
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        tagline:
+          type: string
+        descriptionMarkdown:
+          type: string
+        coverImageUrl:
+          type: string
+        repoUrl:
+          type: string
+        demoUrl:
+          type: string
+        techStack:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: '#/components/schemas/ContentStatus'
+        featured:
+          type: boolean
+        sortOrder:
+          type: integer
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/LinkRequest'
+
+    # --- Blog ---
+    Tag:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+    PostSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        title:
+          type: string
+        excerpt:
+          type: string
+        coverImageUrl:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+    Post:
+      allOf:
+        - $ref: '#/components/schemas/PostSummary'
+        - type: object
+          properties:
+            bodyMarkdown:
+              type: string
+            viewCount:
+              type: integer
+    TagInput:
+      type: object
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+    PostRequest:
+      type: object
+      required: [slug, title]
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        excerpt:
+          type: string
+        bodyMarkdown:
+          type: string
+        coverImageUrl:
+          type: string
+        status:
+          $ref: '#/components/schemas/ContentStatus'
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagInput'
+    SetStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/ContentStatus'
+
+    # --- Stats ---
+    StatsSummary:
+      type: object
+      properties:
+        publishedPosts:
+          type: integer
+        publishedProjects:
+          type: integer
+        featuredProjects:
+          type: integer
+        yearsExperience:
+          type: integer
+        totalPostViews:
+          type: integer
+          format: int64
+    ViewsBucket:
+      type: object
+      properties:
+        bucket:
+          type: string
+          format: date-time
+        views:
+          type: integer
+    TopPost:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        title:
+          type: string
+        views:
+          type: integer
+
+    # --- Auth ---
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+    LoginResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+    RefreshResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+
+    # --- Asset ---
+    Asset:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        url:
+          type: string
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+
+    # --- Profile ---
+    Profile:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        tagline:
+          type: string
+        bioMarkdown:
+          type: string
+        location:
+          type: string
+        avatarUrl:
+          type: string
+        githubUrl:
+          type: string
+        linkedinUrl:
+          type: string
+        twitterUrl:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+    ProfileRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        tagline:
+          type: string
+        bioMarkdown:
+          type: string
+        location:
+          type: string
+        avatarUrl:
+          type: string
+        githubUrl:
+          type: string
+        linkedinUrl:
+          type: string
+        twitterUrl:
+          type: string
+
+    # --- Success envelopes ({"data": ...} / {"data": [...], "meta": ...}) ---
+    ExperienceEnvelope:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Experience'
+    ExperienceListEnvelope:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Experience'
+    ProjectEnvelope:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Project'
+    ProjectListEnvelope:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+    PostEnvelope:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Post'
+    PostListEnvelope:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Post'
+    PostPageEnvelope:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostSummary'
+        meta:
+          $ref: '#/components/schemas/Meta'
+    TagListEnvelope:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+    StatsSummaryEnvelope:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/StatsSummary'
+    ViewsEnvelope:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ViewsBucket'
+    TopPostsEnvelope:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopPost'
+    ProfileEnvelope:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Profile'
+    AssetEnvelope:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Asset'
+    LoginEnvelope:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/LoginResponse'
+    RefreshEnvelope:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/RefreshResponse'
