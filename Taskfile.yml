@@ -1,0 +1,65 @@
+version: '3'
+
+# Tasks load .env (when present) into their environment, so `task run`,
+# `task migrate-up`, etc. see the same variables the app expects.
+dotenv: ['.env']
+
+vars:
+  BINARY: bin/api{{exeExt}}
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+
+  run:
+    desc: Run the API server (loads .env; requires running infra)
+    cmds:
+      - go run ./cmd/api
+
+  build:
+    desc: Build the server binary into bin/
+    cmds:
+      - go build -ldflags="-s -w" -o {{.BINARY}} ./cmd/api
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test ./...
+
+  vet:
+    desc: Static analysis
+    cmds:
+      - go vet ./...
+
+  tidy:
+    desc: Sync go.mod and go.sum
+    cmds:
+      - go mod tidy
+
+  dev:
+    desc: "Run with hot reload via air (install tools first: task tools)"
+    cmds:
+      - air
+
+  migrate-up:
+    desc: Apply all database migrations (uses DATABASE_URL from .env)
+    cmds:
+      - migrate -path migrations -database "{{.DATABASE_URL}}" up
+
+  migrate-down:
+    desc: Roll back all database migrations (uses DATABASE_URL from .env)
+    cmds:
+      - migrate -path migrations -database "{{.DATABASE_URL}}" down
+
+  seed:
+    desc: Load demo data from migrations/seed.sql (requires psql)
+    cmds:
+      - psql "{{.DATABASE_URL}}" -f migrations/seed.sql
+
+  tools:
+    desc: Install dev tools (air for `task dev`, golang-migrate CLI for migrate tasks)
+    cmds:
+      - go install github.com/air-verse/air@latest
+      - go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
