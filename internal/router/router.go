@@ -3,6 +3,7 @@ package router
 import (
 	"time"
 
+	"github.com/gofiber/contrib/v3/swaggerui"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 	"github.com/gookit/slog"
@@ -33,6 +34,16 @@ func Register(app *fiber.App, deps Deps) {
 	app.Use(middleware.Logger(deps.Logger))
 	app.Use(middleware.Recover(deps.Logger))
 	app.Use(middleware.CORS(deps.Cfg))
+
+	// --- Swagger UI (public, outside /api/v1) ---
+	// Serves the UI at /swagger and the spec at /docs/openapi.yaml (read from
+	// ./docs/openapi.yaml relative to the working directory at startup).
+	app.Use(swaggerui.New(swaggerui.Config{
+		BasePath: "/",
+		Path:     "swagger",
+		FilePath: "./docs/openapi.yaml",
+		Title:    "Portfolio API documentation",
+	}))
 
 	api := app.Group("/api/v1")
 
