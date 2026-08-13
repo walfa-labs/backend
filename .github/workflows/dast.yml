@@ -35,10 +35,10 @@ jobs:
       - name: Create Test Environment File
         run: |
           cat << 'EOF' > .env.dast
-          APP_ENV=development
+          APP_ENV=dast
           APP_PORT=:8080
-          ATP_DSN=portfolio/mock@mock_atp
-          ADW_DSN=portfolio/mock@mock_adw
+          ATP_DSN=mock
+          ADW_DSN=mock
           JWT_SECRET=dast-test-secret-key-1234567890
           ADMIN_USERNAME=admin
           ADMIN_PASSWORD_HASH=$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
@@ -56,7 +56,7 @@ jobs:
           docker run -d --name backend-app \
             --env-file .env.dast \
             --network host \
-            portfolio-backend:dast || true
+            portfolio-backend:dast
 
       - name: Wait for API Server to Start
         run: |
@@ -76,7 +76,7 @@ jobs:
           docker_name: 'ghcr.io/zaproxy/zaproxy:stable'
           format: openapi
           target: 'docs/openapi.yaml'
-          cmd_options: '-u http://127.0.0.1:8080 -r dast-report.html -w dast-report.md'
+          cmd_options: '-r dast-report.html -w dast-report.md -J report_json.json -O http://127.0.0.1:8080'
           fail_action: false
 
       - name: Upload ZAP DAST Scan Reports

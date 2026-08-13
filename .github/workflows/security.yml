@@ -28,18 +28,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+          check-latest: true
+
       - name: Run Gitleaks Secrets Scan
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_CONFIG: .gitleaks.toml
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: true
+        run: |
+          go install github.com/zricethezav/gitleaks/v8@latest
+          gitleaks detect --source=. --config=.gitleaks.toml --verbose --redact
 
       - name: Run TruffleHog Secrets Scan
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: ${{ github.event.repository.default_branch }}
+          base: ${{ github.event.repository.default_branch || 'main' }}
           head: HEAD
           extra_args: --only-verified
 
@@ -150,21 +154,13 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      actions: read
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Run Zizmor Workflow Audit
-        uses: woodruffw/zizmor-action@v0.8.0
-        with:
-          args: --format sarif .github/workflows/ > zizmor-results.sarif || true
-
-      - name: Upload Zizmor SARIF Report
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: zizmor-results.sarif
-          category: zizmor
+        uses: zizmorcore/zizmor-action@v0.6.2
 
   codeql:
     name: SAST - GitHub CodeQL Analysis

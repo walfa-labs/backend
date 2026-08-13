@@ -35,6 +35,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: v1.64.5
+          install-mode: goinstall
           args: --timeout=5m
 
       - name: Run go vet
@@ -91,7 +92,7 @@ jobs:
       - name: Build API Binary
         run: |
           mkdir -p bin
-          CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/api ./cmd/api
+          CGO_ENABLED=1 go build -ldflags="-s -w" -o bin/api ./cmd/api
 
   docker-build-scan:
     name: Docker Build & Vulnerability Scan
