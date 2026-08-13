@@ -86,6 +86,10 @@ issues:
         - goconst
         - prealloc
         - gocritic
+    - path: _test\.go
+      text: "SA5012:"
+      linters:
+        - staticcheck
     # Exclude godror helper scan casts in repository adapters
     - path: internal/adapter/repository/
       linters:
