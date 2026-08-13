@@ -1,0 +1,187 @@
+name: DevSecOps Security Scan
+
+on:
+  push:
+    branches: [main, master, dev]
+  pull_request:
+    branches: [main, master, dev]
+  schedule:
+    - cron: '0 6 * * 1' # Every Monday at 06:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  secrets-scan:
+    name: Secrets Detection (Gitleaks & TruffleHog)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks Secrets Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: true
+
+      - name: Run TruffleHog Secrets Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+
+  sast-gosec:
+    name: SAST - Gosec Security Analyzer
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+          check-latest: true
+
+      - name: Install Gosec
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: Run Gosec Scan
+        run: |
+          gosec -fmt=sarif -out=gosec-results.sarif -stdout -verbose=text ./... || true
+
+      - name: Upload Gosec SARIF Results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: gosec-results.sarif
+          category: gosec
+
+  sast-semgrep:
+    name: SAST - Semgrep Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep Rules
+        run: |
+          semgrep scan --config auto --sarif --output semgrep.sarif || true
+
+      - name: Upload Semgrep SARIF Report
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  sca-govulncheck:
+    name: SCA - Go Dependency Vulnerability Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+          check-latest: true
+
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: '1.26.x'
+          go-package: ./...
+
+  sca-trivy-fs:
+    name: SCA & Misconfiguration - Trivy Filesystem Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy FS Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy FS SARIF Report
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-fs-results.sarif
+          category: trivy-fs
+
+  zizmor:
+    name: Workflow Security - Zizmor Linter
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Zizmor Workflow Audit
+        uses: woodruffw/zizmor-action@v0.8.0
+        with:
+          args: --format sarif .github/workflows/ > zizmor-results.sarif || true
+
+      - name: Upload Zizmor SARIF Report
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: zizmor-results.sarif
+          category: zizmor
+
+  codeql:
+    name: SAST - GitHub CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: go
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: codeql-go

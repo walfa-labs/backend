@@ -1,0 +1,91 @@
+name: DAST - Dynamic Application Security Testing
+
+on:
+  pull_request:
+    paths:
+      - 'docs/openapi.yaml'
+      - 'internal/adapter/handler/**'
+      - 'internal/router/**'
+  schedule:
+    - cron: '0 3 * * 0' # Every Sunday at 03:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  zap-api-scan:
+    name: OWASP ZAP OpenAPI Dynamic Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build Local Container Image
+        run: |
+          docker build -t portfolio-backend:dast .
+
+      - name: Create Test Environment File
+        run: |
+          cat << 'EOF' > .env.dast
+          APP_ENV=development
+          APP_PORT=:8080
+          ATP_DSN=portfolio/mock@mock_atp
+          ADW_DSN=portfolio/mock@mock_adw
+          JWT_SECRET=dast-test-secret-key-1234567890
+          ADMIN_USERNAME=admin
+          ADMIN_PASSWORD_HASH=$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
+          OCI_TENANCY_OCID=ocid1.tenancy.oc1..dasttest
+          OCI_USER_OCID=ocid1.user.oc1..dasttest
+          OCI_FINGERPRINT=00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00
+          OCI_REGION=ap-singapore-1
+          OCI_PRIVATE_KEY_PATH=/dev/null
+          OCI_BUCKET=dast-test-bucket
+          CORS_ALLOWED_ORIGINS=http://localhost:3000
+          EOF
+
+      - name: Run Backend App Container
+        run: |
+          docker run -d --name backend-app \
+            --env-file .env.dast \
+            --network host \
+            portfolio-backend:dast || true
+
+      - name: Wait for API Server to Start
+        run: |
+          for i in {1..30}; do
+            if curl -s http://127.0.0.1:8080/swagger/ > /dev/null 2>&1 || curl -s http://127.0.0.1:8080/api/v1/tags > /dev/null 2>&1; then
+              echo "API is responsive!"
+              break
+            fi
+            echo "Waiting for API server to become ready ($i/30)..."
+            sleep 2
+          done
+
+      - name: Run OWASP ZAP API Scan
+        uses: zaproxy/action-api-scan@v0.9.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          docker_name: 'ghcr.io/zaproxy/zaproxy:stable'
+          format: openapi
+          target: 'docs/openapi.yaml'
+          cmd_options: '-u http://127.0.0.1:8080 -r dast-report.html -w dast-report.md'
+          fail_action: false
+
+      - name: Upload ZAP DAST Scan Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-dast-security-report
+          path: |
+            dast-report.html
+            dast-report.md
+            report_json.json
+          retention-days: 14
