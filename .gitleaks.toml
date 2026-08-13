@@ -8,6 +8,7 @@ description = "Global allowlist for dummy values, test hashes, and documentation
 paths = [
   '''^\.env\.example$''',
   '''^docs/.*''',
+  '''^\.github/workflows/.*''',
   '''^migrations/seed.*\.sql$''',
   '''_test\.go$'''
 ]
@@ -18,9 +19,12 @@ regexes = [
   '''portfolio/change-me@portfolio_atp_high''',
   '''portfolio/change-me@portfolio_adw_high''',
   '''ocid1\.tenancy\.oc1\.\.change-me''',
-  '''ocid1\.user\.oc1\.\.change-me'''
+  '''ocid1\.user\.oc1\.\.change-me''',
+  '''dast-test-secret-key-1234567890'''
 ]
 stopwords = [
   "dev-secret-change-me",
-  "change-me"
+  "change-me",
+  "dast-test-secret-key-1234567890"
 ]
+

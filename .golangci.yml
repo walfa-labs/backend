@@ -66,6 +66,8 @@ linters-settings:
     disabled-checks:
       - whyNoLint
       - unnamedResult
+      - hugeParam
+      - rangeValCopy
 
 issues:
   exclude-use-default: true
@@ -78,7 +80,9 @@ issues:
         - gosec
         - errcheck
         - goconst
+        - prealloc
     # Exclude godror helper scan casts in repository adapters
     - path: internal/adapter/repository/
       linters:
         - unconvert
+

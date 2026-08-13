@@ -32,6 +32,7 @@ type Deps struct {
 func Register(app *fiber.App, deps Deps) {
 	// --- Global middleware ---
 	app.Use(middleware.RequestID())
+	app.Use(middleware.SecurityHeaders())
 	app.Use(middleware.Logger(deps.Logger))
 	app.Use(middleware.Recover(deps.Logger))
 	app.Use(middleware.CORS(deps.Cfg))
