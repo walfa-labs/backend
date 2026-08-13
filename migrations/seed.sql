@@ -1,22 +1,43 @@
--- Experiences
-INSERT INTO experiences (experience_type, organization, role_title, location, start_date, end_date, current, summary_markdown, sort_order) VALUES
-  ('work', 'Google', 'Senior Software Engineer', 'Singapore', '2022-01-01', NULL, true, 'Building distributed backend systems and leading backend architecture initiatives.', 0),
-  ('work', 'Stripe', 'Software Engineer II', 'Remote', '2019-06-01', '2021-12-31', false, 'Worked on payment infrastructure processing billions of dollars in transactions.', 1),
-  ('work', 'Vercel', 'Software Engineer Intern', 'Remote', '2018-05-01', '2018-08-31', false, 'Contributed to the Next.js framework and internal tooling.', 2),
-  ('education', 'National University of Singapore', 'B.Sc. Computer Science', 'Singapore', '2015-08-01', '2019-05-31', false, 'First Class Honours. Focus on distributed systems and compilers.', 3);
+-- seed.sql — demo data for the portfolio backend (Oracle ATP schema).
+-- Applied MANUALLY against the ATP database; it is NOT part of the golang-migrate
+-- migration sequence. Assumes 0001/0002 are applied (the singleton profiles row
+-- created by 0002_profile.up.sql is updated at the bottom).
+--
+-- Parent IDs are hardcoded UUID string literals: Oracle does not allow scalar
+-- subqueries in VALUES, and fixed UUIDs make the seed deterministic. Child rows
+-- (highlights, links, post_tags) reference those literals directly.
+--
+-- Notes:
+-- - '' is NULL in Oracle: the empty demo_url values below insert as NULL (the
+--   column is nullable, and the Go layer reads NULL as '').
+-- - If you run this file in SQLcl/SQL*Plus, execute SET SQLBLANKLINES ON first so
+--   the blank lines inside the markdown string literals don't terminate statements.
 
-INSERT INTO experience_highlights (experience_id, body_markdown, sort_order)
-SELECT id, body, ord FROM (VALUES
-  ((SELECT experience_id FROM experiences WHERE organization='Google' AND role_title='Senior Software Engineer'), 'Led migration of monolithic PHP backend to Go microservices, reducing p99 latency by 40%', 0),
-  ((SELECT experience_id FROM experiences WHERE organization='Google' AND role_title='Senior Software Engineer'), 'Designed and implemented a real-time analytics pipeline processing 10M+ events/day', 1),
-  ((SELECT experience_id FROM experiences WHERE organization='Google' AND role_title='Senior Software Engineer'), 'Mentored 3 junior engineers and drove adoption of TDD across the team', 2),
-  ((SELECT experience_id FROM experiences WHERE organization='Stripe' AND role_title='Software Engineer II'), 'Redesigned the dispute resolution API used by 50k+ businesses', 0),
-  ((SELECT experience_id FROM experiences WHERE organization='Stripe' AND role_title='Software Engineer II'), 'Improved payment retry logic, recovering $2M+ in failed transactions annually', 1)
-) AS t(id, body, ord);
+-- Experiences
+INSERT INTO experiences (experience_id, experience_type, organization, role_title, location, start_date, end_date, "current", summary_markdown, sort_order) VALUES
+  ('e1111111-1111-4111-8111-111111111111', 'work', 'Google', 'Senior Software Engineer', 'Singapore', DATE '2022-01-01', NULL, 1, 'Building distributed backend systems and leading backend architecture initiatives.', 0);
+INSERT INTO experiences (experience_id, experience_type, organization, role_title, location, start_date, end_date, "current", summary_markdown, sort_order) VALUES
+  ('e2222222-2222-4222-8222-222222222222', 'work', 'Stripe', 'Software Engineer II', 'Remote', DATE '2019-06-01', DATE '2021-12-31', 0, 'Worked on payment infrastructure processing billions of dollars in transactions.', 1);
+INSERT INTO experiences (experience_id, experience_type, organization, role_title, location, start_date, end_date, "current", summary_markdown, sort_order) VALUES
+  ('e3333333-3333-4333-8333-333333333333', 'work', 'Vercel', 'Software Engineer Intern', 'Remote', DATE '2018-05-01', DATE '2018-08-31', 0, 'Contributed to the Next.js framework and internal tooling.', 2);
+INSERT INTO experiences (experience_id, experience_type, organization, role_title, location, start_date, end_date, "current", summary_markdown, sort_order) VALUES
+  ('e4444444-4444-4444-8444-444444444444', 'education', 'National University of Singapore', 'B.Sc. Computer Science', 'Singapore', DATE '2015-08-01', DATE '2019-05-31', 0, 'First Class Honours. Focus on distributed systems and compilers.', 3);
+
+-- Experience highlights
+INSERT INTO experience_highlights (experience_highlight_id, experience_id, body_markdown, sort_order) VALUES
+  ('d1111111-1111-4111-8111-111111111111', 'e1111111-1111-4111-8111-111111111111', 'Led migration of monolithic PHP backend to Go microservices, reducing p99 latency by 40%', 0);
+INSERT INTO experience_highlights (experience_highlight_id, experience_id, body_markdown, sort_order) VALUES
+  ('d2222222-2222-4222-8222-222222222222', 'e1111111-1111-4111-8111-111111111111', 'Designed and implemented a real-time analytics pipeline processing 10M+ events/day', 1);
+INSERT INTO experience_highlights (experience_highlight_id, experience_id, body_markdown, sort_order) VALUES
+  ('d3333333-3333-4333-8333-333333333333', 'e1111111-1111-4111-8111-111111111111', 'Mentored 3 junior engineers and drove adoption of TDD across the team', 2);
+INSERT INTO experience_highlights (experience_highlight_id, experience_id, body_markdown, sort_order) VALUES
+  ('d4444444-4444-4444-8444-444444444444', 'e2222222-2222-4222-8222-222222222222', 'Redesigned the dispute resolution API used by 50k+ businesses', 0);
+INSERT INTO experience_highlights (experience_highlight_id, experience_id, body_markdown, sort_order) VALUES
+  ('d5555555-5555-4555-8555-555555555555', 'e2222222-2222-4222-8222-222222222222', 'Improved payment retry logic, recovering $2M+ in failed transactions annually', 1);
 
 -- Projects
-INSERT INTO projects (slug, title, tagline, description_markdown, repo_url, demo_url, tech_stack, status, featured, sort_order, published_at) VALUES
-  ('realtime-chat-go', 'Realtime Chat Engine', 'A WebSocket-based chat platform built in Go with 10k concurrent connections.', '## Overview
+INSERT INTO projects (project_id, slug, title, tagline, description_markdown, repo_url, demo_url, tech_stack, status, featured, sort_order, published_at) VALUES
+  ('a1111111-1111-4111-8111-111111111111', 'realtime-chat-go', 'Realtime Chat Engine', 'A WebSocket-based chat platform built in Go with 10k concurrent connections.', '## Overview
 
 A high-performance realtime chat engine built in Go, using WebSocket connections and Redis pub/sub for message distribution.
 
@@ -30,8 +51,9 @@ A high-performance realtime chat engine built in Go, using WebSocket connections
 
 ## Performance
 
-Benchmarked at **10,000 concurrent connections** on a single instance with <50ms message latency.', 'https://github.com/walfa/realtime-chat-go', 'https://chat-demo.walfa.dev', ARRAY['Go', 'WebSocket', 'Redis', 'PostgreSQL', 'Docker'], 'published', true, 0, now()),
-  ('nuxt-portfolio-cms', 'Portfolio CMS', 'A headless CMS for personal portfolios with SSR frontend and Go backend.', '## Overview
+Benchmarked at **10,000 concurrent connections** on a single instance with <50ms message latency.', 'https://github.com/walfa/realtime-chat-go', 'https://chat-demo.walfa.dev', '["Go","WebSocket","Redis","PostgreSQL","Docker"]', 'published', 1, 0, CURRENT_TIMESTAMP);
+INSERT INTO projects (project_id, slug, title, tagline, description_markdown, repo_url, demo_url, tech_stack, status, featured, sort_order, published_at) VALUES
+  ('a2222222-2222-4222-8222-222222222222', 'nuxt-portfolio-cms', 'Portfolio CMS', 'A headless CMS for personal portfolios with SSR frontend and Go backend.', '## Overview
 
 A full-stack portfolio CMS built with Nuxt 4 and Go/Fiber. Features hybrid SSR for SEO, a dashboard with WYSIWYG editor, and S3-compatible asset management.
 
@@ -40,15 +62,17 @@ A full-stack portfolio CMS built with Nuxt 4 and Go/Fiber. Features hybrid SSR f
 - Hybrid SSR + SPA rendering
 - JWT auth with refresh tokens
 - Admin dashboard with CRUD for all entities
-- Terminal-style homepage design', 'https://github.com/walfa/nuxt-portfolio-cms', '', ARRAY['Nuxt', 'Go', 'Fiber', 'PostgreSQL', 'TailwindCSS'], 'published', true, 1, now()),
-  ('url-shortener-rust', 'URL Shortener in Rust', 'A blazing-fast URL shortener written in Rust with SQLite storage.', '## Overview
+- Terminal-style homepage design', 'https://github.com/walfa/nuxt-portfolio-cms', '', '["Nuxt","Go","Fiber","PostgreSQL","TailwindCSS"]', 'published', 1, 1, CURRENT_TIMESTAMP);
+INSERT INTO projects (project_id, slug, title, tagline, description_markdown, repo_url, demo_url, tech_stack, status, featured, sort_order, published_at) VALUES
+  ('a3333333-3333-4333-8333-333333333333', 'url-shortener-rust', 'URL Shortener in Rust', 'A blazing-fast URL shortener written in Rust with SQLite storage.', '## Overview
 
 A minimal URL shortener built in Rust, focusing on performance and simplicity. Uses SQLite for storage and Axum for the web server.
 
 ## Benchmarks
 
-Handles **100k+ requests/sec** on a single core.', 'https://github.com/walfa/url-shortener-rust', 'https://s.walfa.dev', ARRAY['Rust', 'Axum', 'SQLite'], 'published', true, 2, now()),
-  ('cli-task-manager', 'CLI Task Manager', 'A terminal-based task manager written in Go with bubble tea TUI.', '## Overview
+Handles **100k+ requests/sec** on a single core.', 'https://github.com/walfa/url-shortener-rust', 'https://s.walfa.dev', '["Rust","Axum","SQLite"]', 'published', 1, 2, CURRENT_TIMESTAMP);
+INSERT INTO projects (project_id, slug, title, tagline, description_markdown, repo_url, demo_url, tech_stack, status, featured, sort_order, published_at) VALUES
+  ('a4444444-4444-4444-8444-444444444444', 'cli-task-manager', 'CLI Task Manager', 'A terminal-based task manager written in Go with bubble tea TUI.', '## Overview
 
 A keyboard-driven task manager for the terminal, built with Bubble Tea TUI framework.
 
@@ -57,8 +81,9 @@ A keyboard-driven task manager for the terminal, built with Bubble Tea TUI frame
 - Kanban board view
 - Vim-style keybindings
 - Local SQLite storage
-- Export to JSON/Markdown', 'https://github.com/walfa/cli-task-manager', '', ARRAY['Go', 'Bubble Tea', 'SQLite'], 'published', false, 3, now()),
-  ('graphql-mesh-gateway', 'GraphQL Mesh Gateway', 'A unified GraphQL gateway aggregating multiple REST APIs.', '## Overview
+- Export to JSON/Markdown', 'https://github.com/walfa/cli-task-manager', '', '["Go","Bubble Tea","SQLite"]', 'published', 0, 3, CURRENT_TIMESTAMP);
+INSERT INTO projects (project_id, slug, title, tagline, description_markdown, repo_url, demo_url, tech_stack, status, featured, sort_order, published_at) VALUES
+  ('a5555555-5555-4555-8555-555555555555', 'graphql-mesh-gateway', 'GraphQL Mesh Gateway', 'A unified GraphQL gateway aggregating multiple REST APIs.', '## Overview
 
 A GraphQL gateway that aggregates data from multiple REST APIs into a single unified GraphQL schema. Built with Go and gqlgen.
 
@@ -67,20 +92,25 @@ A GraphQL gateway that aggregates data from multiple REST APIs into a single uni
 - Schema stitching
 - Automatic REST to GraphQL mapping
 - Query batching and caching
-- Rate limiting per client', 'https://github.com/walfa/graphql-mesh-gateway', '', ARRAY['Go', 'GraphQL', 'gqlgen', 'Redis'], 'published', false, 4, now());
+- Rate limiting per client', 'https://github.com/walfa/graphql-mesh-gateway', '', '["Go","GraphQL","gqlgen","Redis"]', 'published', 0, 4, CURRENT_TIMESTAMP);
 
 -- Project links
-INSERT INTO project_links (project_id, label, url, kind) VALUES
-  ((SELECT project_id FROM projects WHERE slug='realtime-chat-go'), 'GitHub', 'https://github.com/walfa/realtime-chat-go', 'repo'),
-  ((SELECT project_id FROM projects WHERE slug='realtime-chat-go'), 'Live Demo', 'https://chat-demo.walfa.dev', 'demo'),
-  ((SELECT project_id FROM projects WHERE slug='nuxt-portfolio-cms'), 'GitHub', 'https://github.com/walfa/nuxt-portfolio-cms', 'repo'),
-  ((SELECT project_id FROM projects WHERE slug='url-shortener-rust'), 'GitHub', 'https://github.com/walfa/url-shortener-rust', 'repo'),
-  ((SELECT project_id FROM projects WHERE slug='url-shortener-rust'), 'Live Demo', 'https://s.walfa.dev', 'demo'),
-  ((SELECT project_id FROM projects WHERE slug='cli-task-manager'), 'GitHub', 'https://github.com/walfa/cli-task-manager', 'repo');
+INSERT INTO project_links (project_link_id, project_id, label, url, kind) VALUES
+  ('f1111111-1111-4111-8111-111111111111', 'a1111111-1111-4111-8111-111111111111', 'GitHub', 'https://github.com/walfa/realtime-chat-go', 'repo');
+INSERT INTO project_links (project_link_id, project_id, label, url, kind) VALUES
+  ('f2222222-2222-4222-8222-222222222222', 'a1111111-1111-4111-8111-111111111111', 'Live Demo', 'https://chat-demo.walfa.dev', 'demo');
+INSERT INTO project_links (project_link_id, project_id, label, url, kind) VALUES
+  ('f3333333-3333-4333-8333-333333333333', 'a2222222-2222-4222-8222-222222222222', 'GitHub', 'https://github.com/walfa/nuxt-portfolio-cms', 'repo');
+INSERT INTO project_links (project_link_id, project_id, label, url, kind) VALUES
+  ('f4444444-4444-4444-8444-444444444444', 'a3333333-3333-4333-8333-333333333333', 'GitHub', 'https://github.com/walfa/url-shortener-rust', 'repo');
+INSERT INTO project_links (project_link_id, project_id, label, url, kind) VALUES
+  ('f5555555-5555-4555-8555-555555555555', 'a3333333-3333-4333-8333-333333333333', 'Live Demo', 'https://s.walfa.dev', 'demo');
+INSERT INTO project_links (project_link_id, project_id, label, url, kind) VALUES
+  ('f6666666-6666-4666-8666-666666666666', 'a4444444-4444-4444-8444-444444444444', 'GitHub', 'https://github.com/walfa/cli-task-manager', 'repo');
 
 -- Blog posts
-INSERT INTO blog_posts (slug, title, excerpt, body_markdown, status, view_count, published_at) VALUES
-  ('building-realtime-chat-go-websockets', 'Building a Realtime Chat in Go with WebSockets', 'A deep dive into building a production-grade WebSocket chat server in Go, covering connection pooling, Redis pub/sub, and horizontal scaling.', '# Building a Realtime Chat in Go
+INSERT INTO blog_posts (blog_post_id, slug, title, excerpt, body_markdown, status, view_count, published_at) VALUES
+  ('b1111111-1111-4111-8111-111111111111', 'building-realtime-chat-go-websockets', 'Building a Realtime Chat in Go with WebSockets', 'A deep dive into building a production-grade WebSocket chat server in Go, covering connection pooling, Redis pub/sub, and horizontal scaling.', '# Building a Realtime Chat in Go
 
 When I set out to build a chat system that could handle **10,000 concurrent connections**, I knew Go was the right choice.
 
@@ -104,8 +134,9 @@ A single instance can handle ~10k connections, but what if you need more? Redis 
 
 ## Conclusion
 
-Go makes WebSocket servers straightforward to build. The goroutine-per-connection model is elegant, and with Redis pub/sub, horizontal scaling is trivial.', 'published', 1247, now() - interval '7 days'),
-  ('why-i-chose-go-for-backend', 'Why I Chose Go Over Node.js for Backend', 'After 5 years of Node.js, I switched to Go. Here is what I learned about performance, developer experience, and trade-offs.', '# Why I Chose Go Over Node.js
+Go makes WebSocket servers straightforward to build. The goroutine-per-connection model is elegant, and with Redis pub/sub, horizontal scaling is trivial.', 'published', 1247, CURRENT_TIMESTAMP - INTERVAL '7' DAY);
+INSERT INTO blog_posts (blog_post_id, slug, title, excerpt, body_markdown, status, view_count, published_at) VALUES
+  ('b2222222-2222-4222-8222-222222222222', 'why-i-chose-go-for-backend', 'Why I Chose Go Over Node.js for Backend', 'After 5 years of Node.js, I switched to Go. Here is what I learned about performance, developer experience, and trade-offs.', '# Why I Chose Go Over Node.js
 
 After five years of building backends in Node.js, I made the switch to Go. This was not a decision I took lightly.
 
@@ -135,8 +166,9 @@ Goroutines are game-changing. No callback hell, no async/await pyramid.
 
 ## Conclusion
 
-Go wins for production backends. Node.js wins for rapid prototyping. I use both.', 'published', 3412, now() - interval '14 days'),
-  ('postgres-indexing-strategies', 'Postgres Indexing Strategies I Wish I Knew Earlier', 'A practical guide to choosing the right Postgres index types — B-tree, GIN, BRIN, and partial indexes — with real examples.', '# Postgres Indexing Strategies
+Go wins for production backends. Node.js wins for rapid prototyping. I use both.', 'published', 3412, CURRENT_TIMESTAMP - INTERVAL '14' DAY);
+INSERT INTO blog_posts (blog_post_id, slug, title, excerpt, body_markdown, status, view_count, published_at) VALUES
+  ('b3333333-3333-4333-8333-333333333333', 'postgres-indexing-strategies', 'Postgres Indexing Strategies I Wish I Knew Earlier', 'A practical guide to choosing the right Postgres index types — B-tree, GIN, BRIN, and partial indexes — with real examples.', '# Postgres Indexing Strategies
 
 PostgreSQL has several index types, and choosing the right one can mean the difference between a 2ms and 2000ms query.
 
@@ -165,8 +197,9 @@ For large tables with naturally ordered data (like timestamps), BRIN is incredib
 1. **Always check your query plan** with `EXPLAIN ANALYZE`
 2. **Partial indexes** are underused — they save space and are faster
 3. **GIN** for JSONB and arrays
-4. **BRIN** for time-series data', 'published', 892, now() - interval '21 days'),
-  ('terminal-ui-design-principles', 'Terminal UI Design Principles', 'Designing beautiful terminal interfaces is an art. Here are the principles I follow when building TUI apps with Bubble Tea.', '# Terminal UI Design Principles
+4. **BRIN** for time-series data', 'published', 892, CURRENT_TIMESTAMP - INTERVAL '21' DAY);
+INSERT INTO blog_posts (blog_post_id, slug, title, excerpt, body_markdown, status, view_count, published_at) VALUES
+  ('b4444444-4444-4444-8444-444444444444', 'terminal-ui-design-principles', 'Terminal UI Design Principles', 'Designing beautiful terminal interfaces is an art. Here are the principles I follow when building TUI apps with Bubble Tea.', '# Terminal UI Design Principles
 
 A good terminal UI follows the same principles as a good web UI: hierarchy, contrast, and whitespace.
 
@@ -184,8 +217,9 @@ Every action should have a keyboard shortcut. The mouse is secondary.
 
 ## Conclusion
 
-A well-designed TUI is faster than any web interface for the right tasks.', 'published', 543, now() - interval '30 days'),
-  ('docker-multi-stage-builds-go', 'Docker Multi-Stage Builds for Go', 'Shrink your Go Docker images from 800MB to 15MB with multi-stage builds and scratch images.', '# Docker Multi-Stage Builds for Go
+A well-designed TUI is faster than any web interface for the right tasks.', 'published', 543, CURRENT_TIMESTAMP - INTERVAL '30' DAY);
+INSERT INTO blog_posts (blog_post_id, slug, title, excerpt, body_markdown, status, view_count, published_at) VALUES
+  ('b5555555-5555-4555-8555-555555555555', 'docker-multi-stage-builds-go', 'Docker Multi-Stage Builds for Go', 'Shrink your Go Docker images from 800MB to 15MB with multi-stage builds and scratch images.', '# Docker Multi-Stage Builds for Go
 
 A default Go Docker image is ~800MB. With multi-stage builds, you can get it down to **15MB**.
 
@@ -216,29 +250,37 @@ Result: **15MB** image with zero attack surface.
 |---|---|---|
 | Image size | 800MB | 15MB |
 | Pull time | 30s | 2s |
-| CVEs | 47 | 0 |', 'published', 1876, now() - interval '45 days');
+| CVEs | 47 | 0 |', 'published', 1876, CURRENT_TIMESTAMP - INTERVAL '45' DAY);
 
 -- Tags
-INSERT INTO tags (name, slug) VALUES
-  ('Go', 'go'),
-  ('WebSockets', 'websockets'),
-  ('Redis', 'redis'),
-  ('PostgreSQL', 'postgresql'),
-  ('Rust', 'rust'),
-  ('Docker', 'docker'),
-  ('TypeScript', 'typescript'),
-  ('Nuxt', 'nuxt'),
-  ('Performance', 'performance'),
-  ('DevOps', 'devops');
+INSERT INTO tags (tag_id, name, slug) VALUES ('c1111111-1111-4111-8111-111111111111', 'Go', 'go');
+INSERT INTO tags (tag_id, name, slug) VALUES ('c2222222-2222-4222-8222-222222222222', 'WebSockets', 'websockets');
+INSERT INTO tags (tag_id, name, slug) VALUES ('c3333333-3333-4333-8333-333333333333', 'Redis', 'redis');
+INSERT INTO tags (tag_id, name, slug) VALUES ('c4444444-4444-4444-8444-444444444444', 'PostgreSQL', 'postgresql');
+INSERT INTO tags (tag_id, name, slug) VALUES ('c5555555-5555-4555-8555-555555555555', 'Rust', 'rust');
+INSERT INTO tags (tag_id, name, slug) VALUES ('c6666666-6666-4666-8666-666666666666', 'Docker', 'docker');
+INSERT INTO tags (tag_id, name, slug) VALUES ('c7777777-7777-4777-8777-777777777777', 'TypeScript', 'typescript');
+INSERT INTO tags (tag_id, name, slug) VALUES ('c8888888-8888-4888-8888-888888888888', 'Nuxt', 'nuxt');
+INSERT INTO tags (tag_id, name, slug) VALUES ('c9999999-9999-4999-8999-999999999999', 'Performance', 'performance');
+INSERT INTO tags (tag_id, name, slug) VALUES ('caaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'DevOps', 'devops');
 
 -- Post-tag associations
-INSERT INTO post_tags (blog_post_id, tag_id) SELECT p.blog_post_id, t.tag_id FROM blog_posts p, tags t WHERE p.slug='building-realtime-chat-go-websockets' AND t.slug IN ('go', 'websockets', 'redis', 'performance');
-INSERT INTO post_tags (blog_post_id, tag_id) SELECT p.blog_post_id, t.tag_id FROM blog_posts p, tags t WHERE p.slug='why-i-chose-go-for-backend' AND t.slug IN ('go', 'typescript', 'performance');
-INSERT INTO post_tags (blog_post_id, tag_id) SELECT p.blog_post_id, t.tag_id FROM blog_posts p, tags t WHERE p.slug='postgres-indexing-strategies' AND t.slug IN ('postgresql', 'performance');
-INSERT INTO post_tags (blog_post_id, tag_id) SELECT p.blog_post_id, t.tag_id FROM blog_posts p, tags t WHERE p.slug='terminal-ui-design-principles' AND t.slug IN ('go', 'performance');
-INSERT INTO post_tags (blog_post_id, tag_id) SELECT p.blog_post_id, t.tag_id FROM blog_posts p, tags t WHERE p.slug='docker-multi-stage-builds-go' AND t.slug IN ('go', 'docker', 'devops');
+INSERT INTO post_tags (blog_post_id, tag_id) VALUES ('b1111111-1111-4111-8111-111111111111', 'c1111111-1111-4111-8111-111111111111');
+INSERT INTO post_tags (blog_post_id, tag_id) VALUES ('b1111111-1111-4111-8111-111111111111', 'c2222222-2222-4222-8222-222222222222');
+INSERT INTO post_tags (blog_post_id, tag_id) VALUES ('b1111111-1111-4111-8111-111111111111', 'c3333333-3333-4333-8333-333333333333');
+INSERT INTO post_tags (blog_post_id, tag_id) VALUES ('b1111111-1111-4111-8111-111111111111', 'c9999999-9999-4999-8999-999999999999');
+INSERT INTO post_tags (blog_post_id, tag_id) VALUES ('b2222222-2222-4222-8222-222222222222', 'c1111111-1111-4111-8111-111111111111');
+INSERT INTO post_tags (blog_post_id, tag_id) VALUES ('b2222222-2222-4222-8222-222222222222', 'c7777777-7777-4777-8777-777777777777');
+INSERT INTO post_tags (blog_post_id, tag_id) VALUES ('b2222222-2222-4222-8222-222222222222', 'c9999999-9999-4999-8999-999999999999');
+INSERT INTO post_tags (blog_post_id, tag_id) VALUES ('b3333333-3333-4333-8333-333333333333', 'c4444444-4444-4444-8444-444444444444');
+INSERT INTO post_tags (blog_post_id, tag_id) VALUES ('b3333333-3333-4333-8333-333333333333', 'c9999999-9999-4999-8999-999999999999');
+INSERT INTO post_tags (blog_post_id, tag_id) VALUES ('b4444444-4444-4444-8444-444444444444', 'c1111111-1111-4111-8111-111111111111');
+INSERT INTO post_tags (blog_post_id, tag_id) VALUES ('b4444444-4444-4444-8444-444444444444', 'c9999999-9999-4999-8999-999999999999');
+INSERT INTO post_tags (blog_post_id, tag_id) VALUES ('b5555555-5555-4555-8555-555555555555', 'c1111111-1111-4111-8111-111111111111');
+INSERT INTO post_tags (blog_post_id, tag_id) VALUES ('b5555555-5555-4555-8555-555555555555', 'c6666666-6666-4666-8666-666666666666');
+INSERT INTO post_tags (blog_post_id, tag_id) VALUES ('b5555555-5555-4555-8555-555555555555', 'caaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
 
--- Update profile
+-- Update profile (singleton row created by 0002_profile.up.sql)
 UPDATE profiles SET
   name = 'Walfa',
   email = 'hello@walfa.dev',
@@ -252,5 +294,5 @@ When I am not coding, you can find me contributing to open source, writing about
   github_url = 'https://github.com/walfa',
   linkedin_url = 'https://linkedin.com/in/walfa',
   twitter_url = 'https://twitter.com/walfa',
-  updated_at = now()
+  updated_at = CURRENT_TIMESTAMP
 WHERE profile_id = 1;
