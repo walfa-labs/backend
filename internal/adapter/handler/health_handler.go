@@ -1,23 +1,31 @@
 package handler
 
 import (
+	"database/sql"
+
 	"github.com/gofiber/fiber/v3"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// HealthHandler reports liveness, including connectivity to both Oracle
+// databases (ATP = operational store, ADW = analytics store).
 type HealthHandler struct {
-	db *pgxpool.Pool
+	atp *sql.DB
+	adw *sql.DB
 }
 
-func NewHealthHandler(db *pgxpool.Pool) *HealthHandler {
-	return &HealthHandler{db: db}
+func NewHealthHandler(atp, adw *sql.DB) *HealthHandler {
+	return &HealthHandler{atp: atp, adw: adw}
 }
 
 // Health handles GET /api/v1/health.
 func (h *HealthHandler) Health(c fiber.Ctx) error {
 	status := "ok"
 	dbStatus := "up"
-	if err := h.db.Ping(c.Context()); err != nil {
+	if err := h.atp.PingContext(c.Context()); err != nil {
+		status = "degraded"
+		dbStatus = "down"
+	}
+	if err := h.adw.PingContext(c.Context()); err != nil {
 		status = "degraded"
 		dbStatus = "down"
 	}

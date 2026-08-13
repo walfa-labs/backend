@@ -2,29 +2,30 @@ package platform
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	_ "github.com/godror/godror"
 )
 
-// NewDB parses the database URL, creates a connection pool, and verifies
-// connectivity with a ping. The caller owns the returned pool and must call
-// Close() on shutdown.
-func NewDB(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
-	cfg, err := pgxpool.ParseConfig(databaseURL)
+// NewOracleDB opens a database/sql pool against an Oracle Database (ATP or
+// ADW) via the godror driver and verifies connectivity with a ping. The DSN
+// is a godror connect string ("user/password@tns_alias"); the wallet location
+// is taken from the standard TNS_ADMIN environment variable. The caller owns
+// the returned pool and must call Close() on shutdown.
+//
+// Note: godror requires Oracle Instant Client at runtime (build works
+// without it) and CGO enabled at build time.
+func NewOracleDB(ctx context.Context, dsn string) (*sql.DB, error) {
+	db, err := sql.Open("godror", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("parse database url: %w", err)
+		return nil, fmt.Errorf("open oracle connection: %w", err)
 	}
 
-	pool, err := pgxpool.NewWithConfig(ctx, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("create connection pool: %w", err)
+	if err := db.PingContext(ctx); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("ping oracle: %w", err)
 	}
 
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
-		return nil, fmt.Errorf("ping database: %w", err)
-	}
-
-	return pool, nil
+	return db, nil
 }

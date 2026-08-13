@@ -12,22 +12,33 @@ type Config struct {
 	AppEnv  string `env:"APP_ENV" envDefault:"development"`
 	AppPort string `env:"APP_PORT" envDefault:":8080"`
 
-	DatabaseURL string `env:"DATABASE_URL,required"`
+	// ATPDSN is the godror connect string for Autonomous Transaction
+	// Processing (operational OLTP store), e.g. "user/password@dbname_high".
+	// The wallet location is read from the standard TNS_ADMIN env var by ODPI.
+	ATPDSN string `env:"ATP_DSN,required"`
+	// ADWDSN is the godror connect string for Autonomous Data Warehouse
+	// (analytics store), e.g. "user/password@dbname_high".
+	ADWDSN string `env:"ADW_DSN,required"`
 
-	JWTSecretKey string        `env:"JWT_SECRET,required"`
-	JWTAccessTTL time.Duration `env:"JWT_ACCESS_TTL" envDefault:"15m"`
+	JWTSecretKey  string        `env:"JWT_SECRET,required"`
+	JWTAccessTTL  time.Duration `env:"JWT_ACCESS_TTL" envDefault:"15m"`
 	JWTRefreshTTL time.Duration `env:"JWT_REFRESH_TTL" envDefault:"168h"`
 
 	AdminUsername     string `env:"ADMIN_USERNAME" envDefault:"admin"`
 	AdminPasswordHash string `env:"ADMIN_PASSWORD_HASH,required"`
 
-	ObjectStorage struct {
-		Endpoint     string `env:"ENDPOINT" envDefault:"localhost:9000"`
-		Bucket       string `env:"BUCKET" envDefault:"portfolio-assets"`
-		AccessKey    string `env:"ACCESS_KEY" envDefault:"minio"`
-		SecretKey    string `env:"SECRET_KEY" envDefault:"minio123"`
-		UsePathStyle bool   `env:"USE_PATH_STYLE" envDefault:"true"`
-	} `envPrefix:"OBJECT_STORAGE_"`
+	// OCI holds Oracle Cloud Infrastructure Object Storage credentials and
+	// target bucket. Namespace may be left empty; it is then resolved via the
+	// Object Storage GetNamespace API at startup.
+	OCI struct {
+		TenancyOCID    string `env:"TENANCY_OCID,required"`
+		UserOCID       string `env:"USER_OCID,required"`
+		Fingerprint    string `env:"FINGERPRINT,required"`
+		Region         string `env:"REGION,required"`
+		PrivateKeyPath string `env:"PRIVATE_KEY_PATH,required"`
+		Namespace      string `env:"NAMESPACE"`
+		Bucket         string `env:"BUCKET,required"`
+	} `envPrefix:"OCI_"`
 
 	CORSAllowedOrigins []string `env:"CORS_ALLOWED_ORIGINS" envDefault:"http://localhost:3000" envSeparator:","`
 }
