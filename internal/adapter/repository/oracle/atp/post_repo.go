@@ -198,7 +198,7 @@ func (r *PostRepo) Create(ctx context.Context, p *domain.BlogPost) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO blog_posts
@@ -231,7 +231,7 @@ func (r *PostRepo) Update(ctx context.Context, p *domain.BlogPost) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	res, err := tx.ExecContext(ctx, `
 		UPDATE blog_posts SET

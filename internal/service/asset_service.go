@@ -65,9 +65,7 @@ func (s *AssetService) GetURL(ctx context.Context, key string) (string, error) {
 }
 
 func (s *AssetService) Delete(ctx context.Context, key string) error {
-	if err := s.assetStore.Delete(ctx, key); err != nil {
-		// Log but proceed — the DB record is the source of truth.
-	}
+	_ = s.assetStore.Delete(ctx, key) // Best-effort: proceed — the DB record is the source of truth.
 	return s.assetRepo.DeleteByKey(ctx, key)
 }
 

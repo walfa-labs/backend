@@ -174,7 +174,7 @@ func (r *ProjectRepo) Create(ctx context.Context, p *domain.Project) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO projects
@@ -212,7 +212,7 @@ func (r *ProjectRepo) Update(ctx context.Context, p *domain.Project) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	res, err := tx.ExecContext(ctx, `
 		UPDATE projects SET

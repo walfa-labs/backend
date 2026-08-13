@@ -170,7 +170,7 @@ type ExperienceRepo struct {
 func (r *ExperienceRepo) List(ctx context.Context) ([]domain.Experience, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	var list []domain.Experience
+	list := make([]domain.Experience, 0, len(r.data))
 	for _, e := range r.data {
 		list = append(list, e)
 	}
@@ -244,7 +244,7 @@ func (r *ProjectRepo) ListPublished(ctx context.Context, filter port.ProjectFilt
 func (r *ProjectRepo) ListAll(ctx context.Context) ([]domain.Project, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	var list []domain.Project
+	list := make([]domain.Project, 0, len(r.data))
 	for _, p := range r.data {
 		list = append(list, p)
 	}
@@ -352,7 +352,7 @@ func (r *PostRepo) CountPublished(ctx context.Context, filter port.PostFilter) (
 func (r *PostRepo) ListAll(ctx context.Context) ([]domain.BlogPost, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	var list []domain.BlogPost
+	list := make([]domain.BlogPost, 0, len(r.data))
 	for _, p := range r.data {
 		list = append(list, p)
 	}
@@ -439,7 +439,7 @@ type TagRepo struct {
 func (r *TagRepo) List(ctx context.Context) ([]domain.Tag, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	var list []domain.Tag
+	list := make([]domain.Tag, 0, len(r.data))
 	for _, t := range r.data {
 		list = append(list, t)
 	}
@@ -546,7 +546,7 @@ func (s *AnalyticsStore) ViewsTimeSeries(ctx context.Context, from, to time.Time
 			m[key]++
 		}
 	}
-	var res []port.ViewsBucket
+	res := make([]port.ViewsBucket, 0, len(m))
 	for k, count := range m {
 		t, _ := time.Parse("2006-01-02", k)
 		res = append(res, port.ViewsBucket{Bucket: t, Views: count})
@@ -570,7 +570,7 @@ func (s *AnalyticsStore) TopPosts(ctx context.Context, limit int) ([]port.TopPos
 			}
 		}
 	}
-	var res []port.TopPost
+	res := make([]port.TopPost, 0, len(counts))
 	for _, p := range counts {
 		res = append(res, *p)
 	}

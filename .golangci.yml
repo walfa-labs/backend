@@ -24,6 +24,9 @@ linters:
     - gocritic
 
 linters-settings:
+  errcheck:
+    exclude-functions:
+      - (*database/sql.Tx).Rollback
   govet:
     enable-all: true
     disable:
@@ -68,6 +71,7 @@ linters-settings:
       - unnamedResult
       - hugeParam
       - rangeValCopy
+      - httpNoBody
 
 issues:
   exclude-use-default: true
@@ -81,8 +85,8 @@ issues:
         - errcheck
         - goconst
         - prealloc
+        - gocritic
     # Exclude godror helper scan casts in repository adapters
     - path: internal/adapter/repository/
       linters:
         - unconvert
-

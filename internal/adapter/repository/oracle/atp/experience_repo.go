@@ -89,7 +89,7 @@ func (r *ExperienceRepo) Create(ctx context.Context, e *domain.Experience) error
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO experiences
@@ -122,7 +122,7 @@ func (r *ExperienceRepo) Update(ctx context.Context, e *domain.Experience) error
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	res, err := tx.ExecContext(ctx, `
 		UPDATE experiences SET
