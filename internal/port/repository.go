@@ -98,11 +98,28 @@ type AssetStore interface {
 	Delete(ctx context.Context, key string) error
 }
 
-// StatsRepo reads aggregate statistics.
+// StatsRepo reads aggregate statistics from the operational (OLTP) store.
 type StatsRepo interface {
 	Summary(ctx context.Context) (StatsSummary, error)
+}
+
+// AnalyticsStore records and aggregates post-view analytics events in the
+// analytical (ADW) store. Implementations are expected to denormalize the
+// post slug/title into the warehouse so analytics queries need no cross-store
+// joins.
+type AnalyticsStore interface {
+	RecordPostView(ctx context.Context, view PostView) error
+	TotalViews(ctx context.Context) (int64, error)
 	ViewsTimeSeries(ctx context.Context, from, to time.Time, bucket string) ([]ViewsBucket, error)
 	TopPosts(ctx context.Context, limit int) ([]TopPost, error)
+}
+
+// PostView is a single blog-post view event recorded for analytics.
+type PostView struct {
+	PostID   uuid.UUID
+	Slug     string
+	Title    string
+	ViewedAt time.Time
 }
 
 // StatsSummary is the public-facing counts payload.

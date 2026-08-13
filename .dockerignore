@@ -1,0 +1,47 @@
+# Git
+.git/
+.github/
+
+# Binaries & build artifacts
+bin/
+tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# Go workspace
+go.work
+go.work.sum
+
+# Environment files & secrets
+.env
+.env.local
+.env.*.local
+wallet/
+*.pem
+*.key
+
+# Logs
+logs/
+*.log
+
+# Editor & OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Dev tools config
+.air.toml
+Taskfile.yml

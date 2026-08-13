@@ -1,41 +1,42 @@
-package postgres
+package atp
 
 import (
 	"context"
+	"database/sql"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/walfa-labs/backend/internal/domain"
 	"github.com/walfa-labs/backend/internal/port"
 )
 
-// PostRepo implements port.PostRepo against PostgreSQL.
+// PostRepo implements port.PostRepo against Oracle ATP.
 type PostRepo struct {
-	pool *pgxpool.Pool
+	db *sql.DB
 }
 
 // NewPostRepo constructs a PostRepo bound to the given pool.
-func NewPostRepo(pool *pgxpool.Pool) *PostRepo {
-	return &PostRepo{pool: pool}
+func NewPostRepo(db *sql.DB) *PostRepo {
+	return &PostRepo{db: db}
 }
 
-const postColumns = `blog_post_id, slug, title, COALESCE(excerpt, ''), COALESCE(body_markdown, ''), COALESCE(cover_image_url, ''), status,
+const postColumns = `blog_post_id, slug, title, excerpt, body_markdown, cover_image_url, status,
 	view_count, published_at, created_at, updated_at`
 
-func scanPost(row pgx.Row) (*domain.BlogPost, error) {
+func scanPost(row rowScanner) (*domain.BlogPost, error) {
 	var p domain.BlogPost
-	var publishedAt *time.Time
+	var excerpt, coverURL sql.NullString
+	var publishedAt sql.NullTime
 	err := row.Scan(
-		&p.ID, &p.Slug, &p.Title, &p.Excerpt, &p.BodyMarkdown, &p.CoverImageURL,
+		&p.ID, &p.Slug, &p.Title, &excerpt, &p.BodyMarkdown, &coverURL,
 		&p.Status, &p.ViewCount, &publishedAt, &p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
-	p.PublishedAt = publishedAt
+	p.Excerpt = nullStr(excerpt)
+	p.CoverImageURL = nullStr(coverURL)
+	p.PublishedAt = nullTime(publishedAt)
 	return &p, nil
 }
 
@@ -52,46 +53,49 @@ func (r *PostRepo) ListPublished(ctx context.Context, filter port.PostFilter) ([
 	}
 	offset := (page - 1) * perPage
 
+	const summaryColumns = `blog_post_id, slug, title, excerpt, cover_image_url, published_at`
+
 	if filter.Tag == "" {
-		rows, err := r.pool.Query(ctx, `
-			SELECT blog_post_id, slug, title, COALESCE(excerpt, ''), COALESCE(cover_image_url, ''), published_at
+		rows, err := r.db.QueryContext(ctx, `
+			SELECT `+summaryColumns+`
 			FROM blog_posts
 			WHERE status = 'published'
 			ORDER BY published_at DESC NULLS LAST
-			LIMIT $1 OFFSET $2`, perPage, offset)
+			OFFSET :1 ROWS FETCH NEXT :2 ROWS ONLY`, offset, perPage)
 		if err != nil {
 			return nil, err
 		}
 		defer rows.Close()
-		return scanSummaries(ctx, r.pool, rows)
+		return r.scanSummaries(ctx, rows)
 	}
 
-	rows, err := r.pool.Query(ctx, `
-		SELECT bp.blog_post_id, bp.slug, bp.title, COALESCE(bp.excerpt, ''), COALESCE(bp.cover_image_url, ''), bp.published_at
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT bp.blog_post_id, bp.slug, bp.title, bp.excerpt, bp.cover_image_url, bp.published_at
 		FROM blog_posts bp
 		JOIN post_tags pt ON pt.blog_post_id = bp.blog_post_id
 		JOIN tags t ON t.tag_id = pt.tag_id
-		WHERE bp.status = 'published' AND t.slug = $1
+		WHERE bp.status = 'published' AND t.slug = :1
 		ORDER BY bp.published_at DESC NULLS LAST
-		LIMIT $2 OFFSET $3`, filter.Tag, perPage, offset)
+		OFFSET :2 ROWS FETCH NEXT :3 ROWS ONLY`, filter.Tag, offset, perPage)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	return scanSummaries(ctx, r.pool, rows)
+	return r.scanSummaries(ctx, rows)
 }
 
-func scanSummaries(ctx context.Context, pool interface {
-	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
-}, rows pgx.Rows) ([]port.PostSummary, error) {
+func (r *PostRepo) scanSummaries(ctx context.Context, rows *sql.Rows) ([]port.PostSummary, error) {
 	var out []port.PostSummary
 	for rows.Next() {
 		var s port.PostSummary
-		var publishedAt *time.Time
-		if err := rows.Scan(&s.ID, &s.Slug, &s.Title, &s.Excerpt, &s.CoverImageURL, &publishedAt); err != nil {
+		var excerpt, coverURL sql.NullString
+		var publishedAt sql.NullTime
+		if err := rows.Scan(&s.ID, &s.Slug, &s.Title, &excerpt, &coverURL, &publishedAt); err != nil {
 			return nil, err
 		}
-		s.PublishedAt = publishedAt
+		s.Excerpt = nullStr(excerpt)
+		s.CoverImageURL = nullStr(coverURL)
+		s.PublishedAt = nullTime(publishedAt)
 		out = append(out, s)
 	}
 	if err := rows.Err(); err != nil {
@@ -99,7 +103,7 @@ func scanSummaries(ctx context.Context, pool interface {
 	}
 
 	for i := range out {
-		tags, err := fetchTags(ctx, pool, out[i].ID)
+		tags, err := r.fetchTags(ctx, out[i].ID)
 		if err != nil {
 			return nil, err
 		}
@@ -108,15 +112,13 @@ func scanSummaries(ctx context.Context, pool interface {
 	return out, nil
 }
 
-func fetchTags(ctx context.Context, pool interface {
-	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
-}, postID uuid.UUID) ([]domain.Tag, error) {
-	rows, err := pool.Query(ctx, `
+func (r *PostRepo) fetchTags(ctx context.Context, postID uuid.UUID) ([]domain.Tag, error) {
+	rows, err := r.db.QueryContext(ctx, `
 		SELECT t.tag_id, t.name, t.slug
 		FROM tags t
 		JOIN post_tags pt ON pt.tag_id = t.tag_id
-		WHERE pt.blog_post_id = $1
-		ORDER BY t.name ASC`, postID)
+		WHERE pt.blog_post_id = :1
+		ORDER BY t.name ASC`, postID.String())
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +137,7 @@ func fetchTags(ctx context.Context, pool interface {
 
 // ListAll returns all posts including drafts, ordered by created_at desc.
 func (r *PostRepo) ListAll(ctx context.Context) ([]domain.BlogPost, error) {
-	rows, err := r.pool.Query(ctx, `SELECT `+postColumns+` FROM blog_posts ORDER BY created_at DESC`)
+	rows, err := r.db.QueryContext(ctx, `SELECT `+postColumns+` FROM blog_posts ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +149,7 @@ func (r *PostRepo) ListAll(ctx context.Context) ([]domain.BlogPost, error) {
 		if err != nil {
 			return nil, err
 		}
-		p.Tags, err = fetchTags(ctx, r.pool, p.ID)
+		p.Tags, err = r.fetchTags(ctx, p.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -158,14 +160,15 @@ func (r *PostRepo) ListAll(ctx context.Context) ([]domain.BlogPost, error) {
 
 // GetPublishedBySlug returns a published post with its tags.
 func (r *PostRepo) GetPublishedBySlug(ctx context.Context, slug string) (*domain.BlogPost, error) {
-	p, err := scanPost(r.pool.QueryRow(ctx, `SELECT `+postColumns+` FROM blog_posts WHERE slug = $1 AND status = 'published'`, slug))
+	p, err := scanPost(r.db.QueryRowContext(ctx,
+		`SELECT `+postColumns+` FROM blog_posts WHERE slug = :1 AND status = 'published'`, slug))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
 		return nil, err
 	}
-	p.Tags, err = fetchTags(ctx, r.pool, p.ID)
+	p.Tags, err = r.fetchTags(ctx, p.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -174,14 +177,15 @@ func (r *PostRepo) GetPublishedBySlug(ctx context.Context, slug string) (*domain
 
 // GetByID returns a post with its tags (any status).
 func (r *PostRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.BlogPost, error) {
-	p, err := scanPost(r.pool.QueryRow(ctx, `SELECT `+postColumns+` FROM blog_posts WHERE blog_post_id = $1`, id))
+	p, err := scanPost(r.db.QueryRowContext(ctx,
+		`SELECT `+postColumns+` FROM blog_posts WHERE blog_post_id = :1`, id.String()))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
 		return nil, err
 	}
-	p.Tags, err = fetchTags(ctx, r.pool, p.ID)
+	p.Tags, err = r.fetchTags(ctx, p.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -190,21 +194,20 @@ func (r *PostRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.BlogPost,
 
 // Create inserts a blog post and syncs its tag associations in a transaction.
 func (r *PostRepo) Create(ctx context.Context, p *domain.BlogPost) error {
-	tx, err := r.pool.Begin(ctx)
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback()
 
-	err = tx.QueryRow(ctx, `
+	_, err = tx.ExecContext(ctx, `
 		INSERT INTO blog_posts
-		    (slug, title, excerpt, body_markdown, cover_image_url, status,
+		    (blog_post_id, slug, title, excerpt, body_markdown, cover_image_url, status,
 		     view_count, published_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		RETURNING blog_post_id, created_at, updated_at`,
-		p.Slug, p.Title, p.Excerpt, p.BodyMarkdown, p.CoverImageURL, p.Status,
-		p.ViewCount, p.PublishedAt,
-	).Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt)
+		VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9)`,
+		p.ID.String(), p.Slug, p.Title, clob(p.Excerpt), clob(p.BodyMarkdown), p.CoverImageURL,
+		string(p.Status), p.ViewCount, p.PublishedAt,
+	)
 	if err != nil {
 		return err
 	}
@@ -212,30 +215,37 @@ func (r *PostRepo) Create(ctx context.Context, p *domain.BlogPost) error {
 	if err := r.syncPostTags(ctx, tx, p.ID, p.Tags); err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+
+	err = tx.QueryRowContext(ctx,
+		`SELECT created_at, updated_at FROM blog_posts WHERE blog_post_id = :1`, p.ID.String(),
+	).Scan(&p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // Update modifies a blog post and re-syncs its tag associations.
 func (r *PostRepo) Update(ctx context.Context, p *domain.BlogPost) error {
-	tx, err := r.pool.Begin(ctx)
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback()
 
-	tag, err := tx.Exec(ctx, `
+	res, err := tx.ExecContext(ctx, `
 		UPDATE blog_posts SET
-		    slug = $1, title = $2, excerpt = $3, body_markdown = $4,
-		    cover_image_url = $5, status = $6, view_count = $7, published_at = $8,
-		    updated_at = now()
-		WHERE blog_post_id = $9`,
-		p.Slug, p.Title, p.Excerpt, p.BodyMarkdown, p.CoverImageURL, p.Status,
-		p.ViewCount, p.PublishedAt, p.ID,
+		    slug = :1, title = :2, excerpt = :3, body_markdown = :4,
+		    cover_image_url = :5, status = :6, view_count = :7, published_at = :8,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE blog_post_id = :9`,
+		p.Slug, p.Title, clob(p.Excerpt), clob(p.BodyMarkdown), p.CoverImageURL,
+		string(p.Status), p.ViewCount, p.PublishedAt, p.ID.String(),
 	)
 	if err != nil {
 		return err
 	}
-	if tag.RowsAffected() == 0 {
+	if affected, err := res.RowsAffected(); err == nil && affected == 0 {
 		return domain.ErrNotFound
 	}
 
@@ -243,19 +253,21 @@ func (r *PostRepo) Update(ctx context.Context, p *domain.BlogPost) error {
 		return err
 	}
 
-	if err := tx.QueryRow(ctx, `SELECT updated_at FROM blog_posts WHERE blog_post_id = $1`, p.ID).Scan(&p.UpdatedAt); err != nil {
+	if err := tx.QueryRowContext(ctx,
+		`SELECT updated_at FROM blog_posts WHERE blog_post_id = :1`, p.ID.String(),
+	).Scan(&p.UpdatedAt); err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	return tx.Commit()
 }
 
 // Delete removes a blog post; post_tags associations cascade.
 func (r *PostRepo) Delete(ctx context.Context, id uuid.UUID) error {
-	tag, err := r.pool.Exec(ctx, `DELETE FROM blog_posts WHERE blog_post_id = $1`, id)
+	res, err := r.db.ExecContext(ctx, `DELETE FROM blog_posts WHERE blog_post_id = :1`, id.String())
 	if err != nil {
 		return err
 	}
-	if tag.RowsAffected() == 0 {
+	if affected, err := res.RowsAffected(); err == nil && affected == 0 {
 		return domain.ErrNotFound
 	}
 	return nil
@@ -263,14 +275,15 @@ func (r *PostRepo) Delete(ctx context.Context, id uuid.UUID) error {
 
 // IncrementViewCount atomically bumps view_count.
 func (r *PostRepo) IncrementViewCount(ctx context.Context, id uuid.UUID) error {
-	_, err := r.pool.Exec(ctx, `UPDATE blog_posts SET view_count = view_count + 1 WHERE blog_post_id = $1`, id)
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE blog_posts SET view_count = view_count + 1 WHERE blog_post_id = :1`, id.String())
 	return err
 }
 
 // SumViews returns the total view count across all posts.
 func (r *PostRepo) SumViews(ctx context.Context) (int64, error) {
 	var sum int64
-	err := r.pool.QueryRow(ctx, `SELECT COALESCE(SUM(view_count), 0) FROM blog_posts`).Scan(&sum)
+	err := r.db.QueryRowContext(ctx, `SELECT NVL(SUM(view_count), 0) FROM blog_posts`).Scan(&sum)
 	return sum, err
 }
 
@@ -279,28 +292,29 @@ func (r *PostRepo) SumViews(ctx context.Context) (int64, error) {
 func (r *PostRepo) CountPublished(ctx context.Context, filter port.PostFilter) (int64, error) {
 	if filter.Tag == "" {
 		var count int64
-		err := r.pool.QueryRow(ctx, `
-			SELECT COUNT(*) FROM blog_posts WHERE status = 'published'`).Scan(&count)
+		err := r.db.QueryRowContext(ctx,
+			`SELECT COUNT(*) FROM blog_posts WHERE status = 'published'`).Scan(&count)
 		return count, err
 	}
 
 	var count int64
-	err := r.pool.QueryRow(ctx, `
+	err := r.db.QueryRowContext(ctx, `
 		SELECT COUNT(DISTINCT bp.blog_post_id)
 		FROM blog_posts bp
 		JOIN post_tags pt ON pt.blog_post_id = bp.blog_post_id
 		JOIN tags t ON t.tag_id = pt.tag_id
-		WHERE bp.status = 'published' AND t.slug = $1`, filter.Tag).Scan(&count)
+		WHERE bp.status = 'published' AND t.slug = :1`, filter.Tag).Scan(&count)
 	return count, err
 }
 
 // syncPostTags replaces a post's tag associations.
-func (r *PostRepo) syncPostTags(ctx context.Context, tx pgx.Tx, postID uuid.UUID, tags []domain.Tag) error {
-	if _, err := tx.Exec(ctx, `DELETE FROM post_tags WHERE blog_post_id = $1`, postID); err != nil {
+func (r *PostRepo) syncPostTags(ctx context.Context, tx *sql.Tx, postID uuid.UUID, tags []domain.Tag) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM post_tags WHERE blog_post_id = :1`, postID.String()); err != nil {
 		return err
 	}
 	for _, t := range tags {
-		_, err := tx.Exec(ctx, `INSERT INTO post_tags (blog_post_id, tag_id) VALUES ($1, $2)`, postID, t.ID)
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO post_tags (blog_post_id, tag_id) VALUES (:1, :2)`, postID.String(), t.ID.String())
 		if err != nil {
 			return err
 		}

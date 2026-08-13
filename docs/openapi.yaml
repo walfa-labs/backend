@@ -52,7 +52,7 @@ tags:
   - name: profile
     description: Singleton profile
   - name: assets
-    description: Image assets (S3-backed)
+    description: Image assets (OCI Object Storage backed)
 
 paths:
   /api/v1/health:
@@ -255,7 +255,7 @@ paths:
       tags: [assets]
       summary: Redirect to a presigned asset URL
       description: Looks up the asset key (may contain slashes, e.g. `images/<uuid>.png`)
-        and 302-redirects to a presigned S3 URL (1 h expiry).
+        and 302-redirects to an OCI pre-authenticated request (PAR) URL (1 h expiry).
       operationId: redirectAsset
       security: []
       parameters:

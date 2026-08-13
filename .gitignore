@@ -10,6 +10,8 @@
 *.test
 *.out
 coverage.txt
+coverage/
+
 
 # Go workspace
 go.work
@@ -19,6 +21,10 @@ go.work.sum
 .env
 .env.local
 .env.*.local
+
+# Oracle Cloud credentials
+wallet/
+*.pem
 
 # Logs
 logs/
@@ -30,6 +36,12 @@ logs/
 *.swp
 *.swo
 *~
+
+# AI coding agents (per-machine local config only).
+# Keeps shared agent rule markdown tracked: AGENTS.md, .agent/, .antigravityignore.
+.kimi-code/
+.zcode/
+.antigravity/
 
 # OS
 .DS_Store

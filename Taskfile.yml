@@ -6,60 +6,205 @@ dotenv: ['.env']
 
 vars:
   BINARY: bin/api{{exeExt}}
+  IMAGE_NAME: portfolio-backend
+  IMAGE_TAG: latest
 
 tasks:
   default:
-    desc: List available tasks
+    desc: "List all available tasks"
     cmds:
       - task --list
 
+  # ============================================================================
+  # Development & Build Tasks
+  # ============================================================================
+
   run:
-    desc: Run the API server (loads .env; requires running infra)
+    desc: "Run the API server locally (loads .env; requires running infra)"
     cmds:
       - go run ./cmd/api
-
-  build:
-    desc: Build the server binary into bin/
-    cmds:
-      - go build -ldflags="-s -w" -o {{.BINARY}} ./cmd/api
-
-  test:
-    desc: Run all tests
-    cmds:
-      - go test ./...
-
-  vet:
-    desc: Static analysis
-    cmds:
-      - go vet ./...
-
-  tidy:
-    desc: Sync go.mod and go.sum
-    cmds:
-      - go mod tidy
 
   dev:
     desc: "Run with hot reload via air (install tools first: task tools)"
     cmds:
       - air
 
-  migrate-up:
-    desc: Apply all database migrations (uses DATABASE_URL from .env)
+  build:
+    desc: "Build the server binary into bin/"
     cmds:
-      - migrate -path migrations -database "{{.DATABASE_URL}}" up
+      - go build -ldflags="-s -w" -o {{.BINARY}} ./cmd/api
+
+  clean:
+    desc: "Clean build binaries, test output, and logs"
+    cmds:
+      - cmd /c "if exist bin rmdir /s /q bin"
+      - cmd /c "if exist coverage.txt del coverage.txt"
+      - cmd /c "if exist coverage.html del coverage.html"
+      - cmd /c "if exist tmp rmdir /s /q tmp"
+
+  tidy:
+    desc: "Sync and tidy go.mod and go.sum"
+    cmds:
+      - go mod tidy
+
+  fmt:
+    desc: "Format Go source files"
+    cmds:
+      - go fmt ./...
+
+  vet:
+    desc: "Run standard Go static analysis (go vet)"
+    cmds:
+      - go vet ./...
+
+  # ============================================================================
+  # Testing Tasks
+  # ============================================================================
+
+  test:
+    desc: "Run all tests (unit and integration)"
+    cmds:
+      - go test -v ./...
+
+  test:unit:
+    desc: "Run unit tests"
+    cmds:
+      - go test -v ./internal/...
+
+  test:integration:
+    desc: "Run HTTP integration tests"
+    cmds:
+      - go test -v ./internal/router/...
+
+  test:coverage:
+    desc: "Run all tests with code coverage profiling"
+    cmds:
+      - go test -cover -coverprofile coverage.txt ./...
+      - go tool cover -func coverage.txt
+
+  test:html:
+    desc: "Generate HTML code coverage report"
+    deps: [test:coverage]
+    cmds:
+      - go tool cover -html=coverage.txt -o coverage.html
+      - echo Coverage HTML report generated at coverage.html
+
+  # ============================================================================
+  # Linting Tasks
+  # ============================================================================
+
+  lint:
+    desc: "Run golangci-lint with configured linters"
+    cmds:
+      - golangci-lint run ./...
+
+  lint:fix:
+    desc: "Run golangci-lint and automatically fix issues where supported"
+    cmds:
+      - golangci-lint run --fix ./...
+
+  # ============================================================================
+  # Security Scanning Tasks (DevSecOps)
+  # ============================================================================
+
+  scan:secrets:
+    desc: "Run Gitleaks secret detection locally"
+    cmds:
+      - gitleaks detect --config=.gitleaks.toml --verbose --no-git
+
+  scan:sast:
+    desc: "Run SAST security scanning via Gosec"
+    cmds:
+      - gosec -fmt=text ./...
+
+  scan:sca:
+    desc: "Run SCA vulnerability checks on dependencies via govulncheck"
+    cmds:
+      - govulncheck ./...
+
+  scan:zizmor:
+    desc: "Audit GitHub Actions workflows for security vulnerabilities via Zizmor"
+    cmds:
+      - zizmor .github/workflows/
+
+  scan:docker:
+    desc: "Scan Docker container image for vulnerabilities via Trivy"
+    cmds:
+      - trivy image {{.IMAGE_NAME}}:{{.IMAGE_TAG}}
+
+  scan:dast:
+    desc: "Run OWASP ZAP API Dynamic Security Scan against local running API"
+    cmds:
+      - docker compose --profile dast run zap-dast
+
+  scan:all:
+    desc: "Run all local static security scans (Secrets, SAST, SCA, Workflows)"
+    cmds:
+      - task: scan:secrets
+      - task: scan:sast
+      - task: scan:sca
+      - task: scan:zizmor
+
+  # ============================================================================
+  # Docker Tasks
+  # ============================================================================
+
+  docker:build:
+    desc: "Build local Docker image using multi-stage Dockerfile"
+    cmds:
+      - docker build -t {{.IMAGE_NAME}}:{{.IMAGE_TAG}} .
+
+  docker:run:
+    desc: "Run local Docker container"
+    cmds:
+      - docker run -d --name {{.IMAGE_NAME}} -p 8080:8080 --env-file .env {{.IMAGE_NAME}}:{{.IMAGE_TAG}}
+
+  docker:stop:
+    desc: "Stop and remove local Docker container"
+    cmds:
+      - docker stop {{.IMAGE_NAME}} || true
+      - docker rm {{.IMAGE_NAME}} || true
+
+  docker:compose-up:
+    desc: "Start all services via docker-compose"
+    cmds:
+      - docker compose up -d
+
+  docker:compose-down:
+    desc: "Stop all services via docker-compose"
+    cmds:
+      - docker compose down
+
+  # ============================================================================
+  # Database & Migration Tasks
+  # ============================================================================
+
+  migrate-up:
+    desc: "Apply all database migrations to ATP then ADW (MIGRATE_*_URL from .env; wallet via TNS_ADMIN)"
+    cmds:
+      - migrate -path migrations/atp -database "{{.MIGRATE_ATP_URL}}" up
+      - migrate -path migrations/adw -database "{{.MIGRATE_ADW_URL}}" up
 
   migrate-down:
-    desc: Roll back all database migrations (uses DATABASE_URL from .env)
+    desc: "Roll back all database migrations on ADW then ATP (MIGRATE_*_URL from .env)"
     cmds:
-      - migrate -path migrations -database "{{.DATABASE_URL}}" down
+      - migrate -path migrations/adw -database "{{.MIGRATE_ADW_URL}}" down
+      - migrate -path migrations/atp -database "{{.MIGRATE_ATP_URL}}" down
 
   seed:
-    desc: Load demo data from migrations/seed.sql (requires psql)
+    desc: "Load demo data into ATP from migrations/seed.sql (requires SQLcl; wallet via TNS_ADMIN)"
     cmds:
-      - psql "{{.DATABASE_URL}}" -f migrations/seed.sql
+      - sql "{{.ATP_DSN}}" @migrations/seed.sql
+
+  # ============================================================================
+  # Tooling Installation
+  # ============================================================================
 
   tools:
-    desc: Install dev tools (air for `task dev`, golang-migrate CLI for migrate tasks)
+    desc: "Install all development and security CLI tools"
     cmds:
       - go install github.com/air-verse/air@latest
-      - go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - go install golang.org/x/vuln/cmd/govulncheck@latest
+      - go install -tags 'oracle' github.com/golang-migrate/migrate/v4/cmd/migrate@latest

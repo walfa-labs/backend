@@ -1,6 +1,6 @@
 # Portfolio Backend
 
-Go (Fiber v3) backend API for a personal portfolio with dynamic content — experience, projects, and blog posts. Built with a clean/hexagonal architecture (Ports & Adapters), Sonic JSON, gookit/slog logging, PostgreSQL, and S3-compatible object storage.
+Go (Fiber v3) backend API for a personal portfolio with dynamic content — experience, projects, and blog posts. Built with a clean/hexagonal architecture (Ports & Adapters), Sonic JSON, gookit/slog logging, and Oracle Cloud polyglot persistence: Autonomous Transaction Processing (ATP) for operational data, Autonomous Data Warehouse (ADW) for analytics, and OCI Object Storage for assets.
 
 ## Tech Stack
 
@@ -10,10 +10,11 @@ Go (Fiber v3) backend API for a personal portfolio with dynamic content — expe
 | JSON | [Sonic](https://github.com/bytedance/sonic) (JIT + SIMD) |
 | Logging | [gookit/slog](https://github.com/gookit/slog) (rotating files + colored console) |
 | Validation | [go-playground/validator](https://github.com/go-playground/validator) |
-| Database | [pgx/v5](https://github.com/jackc/pgx) + PostgreSQL 16+ |
-| Migrations | [golang-migrate](https://github.com/golang-migrate/migrate) |
+| Database (OLTP) | Oracle ATP via [godror](https://github.com/godror/godror) (database/sql) |
+| Database (analytics) | Oracle ADW via [godror](https://github.com/godror/godror) (database/sql) |
+| Migrations | [golang-migrate](https://github.com/golang-migrate/migrate) (oracle driver) |
 | Auth | [golang-jwt/v5](https://github.com/golang-jwt/jwt) |
-| Object storage | [minio-go/v7](https://github.com/minio/minio-go) (S3-compatible) |
+| Object storage | [oci-go-sdk](https://github.com/oracle/oci-go-sdk) (OCI Object Storage) |
 | Config | [caarlos0/env](https://github.com/caarlos0/env) |
 | API docs | [contrib/swaggerui](https://github.com/gofiber/contrib) (Swagger UI + OpenAPI 3) |
 
@@ -29,40 +30,48 @@ internal/
   adapter/
     handler/             → HTTP handlers (Fiber driving adapter)
     middleware/          → recover, logger, cors, auth, error, requestid
-    repository/postgres/ → Postgres implementations (driven adapter)
-    repository/s3/       → S3 asset store (driven adapter)
+    repository/oracle/
+      atp/               → ATP (OLTP) repositories (driven adapter)
+      adw/               → ADW analytics store (driven adapter)
+      objectstorage/     → OCI Object Storage asset store (driven adapter)
   router/                → route registration
   platform/              → server factory, logger, db pool, json, validator
-migrations/              → golang-migrate SQL files
+migrations/
+  atp/                   → golang-migrate sequence for the ATP database
+  adw/                   → golang-migrate sequence for the ADW database
+  seed.sql               → demo data for ATP (applied manually)
 ```
 
 ## Quick Start
 
-Prerequisites: Go 1.26+, [Task](https://taskfile.dev), and **already-running infrastructure** — this project does not deploy anything itself. You need:
+Prerequisites: Go 1.26+, [Task](https://taskfile.dev), and **already-running Oracle Cloud infrastructure** — this project does not deploy anything itself. You need (all available in the OCI Always Free tier):
 
-- a PostgreSQL 16+ database you can reach (local install, home server, managed — anything),
-- an S3-compatible bucket (MinIO, R2, S3) that already exists,
-- `psql` and the `golang-migrate` CLI for the DB tasks (`task tools` installs the latter).
+- an **Autonomous Transaction Processing** database and an **Autonomous Data Warehouse** database, with their wallet zip(s) downloaded and unzipped (point `TNS_ADMIN` at the wallet directory),
+- an **OCI Object Storage** bucket that already exists, plus an OCI API key pair (unencrypted PEM) for a user with access to it,
+- **Oracle Instant Client** installed (godror needs it at runtime; builds work without it),
+- a **C compiler for CGO** (`gcc`/`clang`; `zig cc` works) — godror requires `CGO_ENABLED=1`,
+- **SQLcl** (`sql`) and the **golang-migrate** CLI for the DB tasks (`task tools` installs the latter, built with the `oracle` tag).
 
 All connection details live in `.env`:
 
 ```bash
 # Copy the env template, then edit it to point at your infra:
-# DATABASE_URL, OBJECT_STORAGE_ENDPOINT/BUCKET/ACCESS_KEY/SECRET_KEY,
+# ATP_DSN, ADW_DSN, TNS_ADMIN, MIGRATE_ATP_URL/MIGRATE_ADW_URL,
+# OCI_TENANCY_OCID/USER_OCID/FINGERPRINT/REGION/PRIVATE_KEY_PATH/BUCKET,
 # JWT_SECRET, ADMIN_PASSWORD_HASH, ... (see .env.example for everything)
 cp .env.example .env
 
 # Install dev tools used below (air + golang-migrate CLI)
 task tools
 
-# Apply database migrations, then optionally load demo data
+# Apply database migrations to ATP and ADW, then optionally load demo data
 task migrate-up
 task seed
 
 # Create an admin user — login reads the admin_users table, not
 # ADMIN_PASSWORD_HASH; generate your own bcrypt hash for anything real.
-psql "$DATABASE_URL" -c \
-  "INSERT INTO admin_users (username, password_hash) VALUES ('admin', '<bcrypt-hash>');"
+sql "$ATP_DSN" <<< \
+  "INSERT INTO admin_users (admin_user_id, username, password_hash) VALUES ('<uuid>', 'admin', '<bcrypt-hash>');"
 
 # Start the server on :8080 (Task loads .env automatically)
 task run
@@ -70,6 +79,8 @@ task run
 
 Without Task, the equivalent is to export the variables yourself:
 `set -a; . ./.env; set +a && go run ./cmd/api`
+
+Note: there is intentionally no `docker-compose.yml` anymore — the datastores are managed Oracle Cloud services, so there is nothing to run locally in containers.
 
 ## API Endpoints
 
@@ -143,7 +154,7 @@ task build        # build the binary to bin/
 task test         # go test ./...
 task vet          # go vet ./...
 task tidy         # go mod tidy
-task migrate-up   # apply migrations (DATABASE_URL from .env)
+task migrate-up   # apply migrations to ATP + ADW (MIGRATE_*_URL from .env)
 task migrate-down # roll back migrations
-task seed         # load demo data
+task seed         # load demo data into ATP
 ```

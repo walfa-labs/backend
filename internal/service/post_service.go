@@ -12,11 +12,12 @@ import (
 )
 
 type PostService struct {
-	repo port.PostRepo
+	repo      port.PostRepo
+	analytics port.AnalyticsStore
 }
 
-func NewPostService(repo port.PostRepo) *PostService {
-	return &PostService{repo: repo}
+func NewPostService(repo port.PostRepo, analytics port.AnalyticsStore) *PostService {
+	return &PostService{repo: repo, analytics: analytics}
 }
 
 // ListPublished returns published post summaries and a total count.
@@ -51,8 +52,18 @@ func (s *PostService) GetPublishedBySlug(ctx context.Context, slug string) (*dom
 		}
 		return nil, err
 	}
-	// Best-effort view count increment (§6.4 approach #1).
+	// Best-effort dual-write view tracking (§6.4 approach #1):
+	//   - ATP view_count counter stays the fast per-post number shown in post
+	//     responses (keeps the public API shape unchanged).
+	//   - ADW receives one fact_post_views event per view and is the source of
+	//     truth for admin analytics (time series, top posts, total views).
 	_ = s.repo.IncrementViewCount(ctx, p.ID)
+	_ = s.analytics.RecordPostView(ctx, port.PostView{
+		PostID:   p.ID,
+		Slug:     p.Slug,
+		Title:    p.Title,
+		ViewedAt: time.Now(),
+	})
 	return p, nil
 }
 

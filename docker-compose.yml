@@ -1,52 +1,41 @@
 services:
-  postgres:
-    image: postgres:latest
-    container_name: walfa-postgres
-    environment:
-      POSTGRES_USER: portfolio
-      POSTGRES_PASSWORD: dev
-      POSTGRES_DB: portfolio
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: portfolio-backend:latest
+    container_name: portfolio-backend
     ports:
-      - "5432:5432"
-    volumes:
-      - postgres-data:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U portfolio -d portfolio"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  minio:
-    image: minio/minio:latest
-    container_name: walfa-minio
-    command: server /data --console-address ":9001"
+      - "8080:8080"
+    env_file:
+      - path: .env
+        required: false
     environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio123
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+      - APP_ENV=production
+      - APP_PORT=:8080
+      - TNS_ADMIN=/app/wallet
+      - OCI_PRIVATE_KEY_PATH=/app/oci_api_key.pem
     volumes:
-      - minio-data:/data
+      - ./wallet:/app/wallet:ro
+      - ./oci_api_key.pem:/app/oci_api_key.pem:ro
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 15s
       timeout: 5s
-      retries: 10
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
 
-  minio-init:
-    image: minio/mc:latest
-    container_name: walfa-minio-init
+  # Dynamic Application Security Testing (DAST) runner via OWASP ZAP
+  # Run via: docker compose --profile dast run zap-dast
+  zap-dast:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    container_name: portfolio-zap-dast
+    profiles:
+      - dast
     depends_on:
-      minio:
+      backend:
         condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 minio minio123;
-      mc mb --ignore-existing local/portfolio-assets;
-      "
-    restart: "no"
-
-volumes:
-  postgres-data:
-  minio-data:
+    volumes:
+      - ./docs:/zap/wrk/:rw
+    command: zap-api-scan.py -t /zap/wrk/openapi.yaml -f openapi -u http://backend:8080 -r dast-report.html

@@ -1,6 +1,7 @@
 package router
 
 import (
+	"os"
 	"time"
 
 	"github.com/gofiber/contrib/v3/swaggerui"
@@ -36,12 +37,12 @@ func Register(app *fiber.App, deps Deps) {
 	app.Use(middleware.CORS(deps.Cfg))
 
 	// --- Swagger UI (public, outside /api/v1) ---
-	// Serves the UI at /swagger and the spec at /docs/openapi.yaml (read from
-	// ./docs/openapi.yaml relative to the working directory at startup).
+	// Serves the UI at /swagger and the spec at openapi.yaml
+	openapiPath := resolveOpenAPIPath()
 	app.Use(swaggerui.New(swaggerui.Config{
 		BasePath: "/",
 		Path:     "swagger",
-		FilePath: "./docs/openapi.yaml",
+		FilePath: openapiPath,
 		Title:    "Portfolio API documentation",
 	}))
 
@@ -81,7 +82,7 @@ func Register(app *fiber.App, deps Deps) {
 	auth.Post("/refresh", deps.Auth.Refresh)
 
 	// --- Admin (auth required) ---
-	admin := api.Group("/admin", deps.AuthMiddleware)
+	admin := api.Group("/admin", deps.AuthMiddleware, middleware.RequireAdmin())
 
 	// Experiences CRUD
 	admin.Get("/experiences", deps.Experience.List)
@@ -119,4 +120,18 @@ func Register(app *fiber.App, deps Deps) {
 	// Profile (admin singleton — upsert)
 	admin.Get("/profile", deps.Profile.AdminGet)
 	admin.Put("/profile", deps.Profile.Update)
+}
+
+func resolveOpenAPIPath() string {
+	candidates := []string{
+		"./docs/openapi.yaml",
+		"../../docs/openapi.yaml",
+		"../docs/openapi.yaml",
+	}
+	for _, p := range candidates {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return "./docs/openapi.yaml"
 }
