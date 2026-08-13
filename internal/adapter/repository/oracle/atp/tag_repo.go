@@ -1,27 +1,27 @@
-package postgres
+package atp
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/google/uuid"
 	"github.com/walfa-labs/backend/internal/domain"
 )
 
-// TagRepo implements port.TagRepo against PostgreSQL.
+// TagRepo implements port.TagRepo against Oracle ATP.
 type TagRepo struct {
-	pool *pgxpool.Pool
+	db *sql.DB
 }
 
 // NewTagRepo constructs a TagRepo bound to the given pool.
-func NewTagRepo(pool *pgxpool.Pool) *TagRepo {
-	return &TagRepo{pool: pool}
+func NewTagRepo(db *sql.DB) *TagRepo {
+	return &TagRepo{db: db}
 }
 
 // List returns all tags ordered by name.
 func (r *TagRepo) List(ctx context.Context) ([]domain.Tag, error) {
-	rows, err := r.pool.Query(ctx, `SELECT tag_id, name, slug FROM tags ORDER BY name ASC`)
+	rows, err := r.db.QueryContext(ctx, `SELECT tag_id, name, slug FROM tags ORDER BY name ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -40,22 +40,20 @@ func (r *TagRepo) List(ctx context.Context) ([]domain.Tag, error) {
 
 // GetOrCreate inserts a tag with the given name/slug if absent and returns it.
 func (r *TagRepo) GetOrCreate(ctx context.Context, name, slug string) (*domain.Tag, error) {
-	var t domain.Tag
-	err := r.pool.QueryRow(ctx, `
-		INSERT INTO tags (name, slug)
-		VALUES ($1, $2)
-		ON CONFLICT (slug) DO NOTHING
-		RETURNING tag_id, name, slug`, name, slug).Scan(&t.ID, &t.Name, &t.Slug)
-	if err == nil {
-		return &t, nil
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
+	if _, err := r.db.ExecContext(ctx, `
+		MERGE INTO tags t
+		USING (SELECT :1 AS name, :2 AS slug FROM dual) s
+		ON (t.slug = s.slug)
+		WHEN NOT MATCHED THEN INSERT (tag_id, name, slug) VALUES (:3, s.name, s.slug)`,
+		name, slug, uuid.New().String()); err != nil {
 		return nil, err
 	}
-	// Row was not inserted because a tag with this slug already exists.
-	err = r.pool.QueryRow(ctx, `SELECT tag_id, name, slug FROM tags WHERE slug = $1`, slug).Scan(&t.ID, &t.Name, &t.Slug)
+
+	var t domain.Tag
+	err := r.db.QueryRowContext(ctx,
+		`SELECT tag_id, name, slug FROM tags WHERE slug = :1`, slug).Scan(&t.ID, &t.Name, &t.Slug)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
 		return nil, err

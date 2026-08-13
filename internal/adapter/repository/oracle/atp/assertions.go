@@ -1,7 +1,8 @@
-package postgres
+package atp
 
 import (
-	"github.com/jackc/pgx/v5/pgxpool"
+	"database/sql"
+
 	"github.com/walfa-labs/backend/internal/port"
 )
 
@@ -14,8 +15,8 @@ var (
 	_ port.AssetRepo      = (*AssetRepo)(nil)
 	_ port.AdminRepo      = (*AdminRepo)(nil)
 	_ port.StatsRepo      = (*StatsRepo)(nil)
+	_ port.ProfileRepo    = (*ProfileRepo)(nil)
 )
 
-// Compile-time guard to keep the pgxpool import meaningful even if constructors
-// are reorganized; it documents the shared dependency of all repos here.
-var _ = (*pgxpool.Pool)(nil)
+// Compile-time guard documenting the shared dependency of all repos here.
+var _ = (*sql.DB)(nil)
