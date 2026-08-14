@@ -17,6 +17,7 @@ import (
 	"github.com/walfa-labs/backend/internal/adapter/repository/oracle/adw"
 	"github.com/walfa-labs/backend/internal/adapter/repository/oracle/atp"
 	"github.com/walfa-labs/backend/internal/adapter/repository/oracle/objectstorage"
+	pgRepo "github.com/walfa-labs/backend/internal/adapter/repository/postgres"
 	"github.com/walfa-labs/backend/internal/config"
 	"github.com/walfa-labs/backend/internal/platform"
 	"github.com/walfa-labs/backend/internal/port"
@@ -56,7 +57,7 @@ func main() {
 		healthH        *handler.HealthHandler
 	)
 
-	if cfg.AppEnv == "dast" || cfg.AppEnv == "mock" || cfg.ATPDSN == "mock" {
+	if cfg.AppEnv == "dast" || cfg.AppEnv == "mock" {
 		logger.Info("running with in-memory repositories (DAST / mock mode)")
 		memStore := memory.NewStore(cfg.AdminPasswordHash)
 		expRepo = memStore.Experience
@@ -71,31 +72,57 @@ func main() {
 		assetStore = memStore.AssetStorage
 		healthH = handler.NewHealthHandler(nil, nil)
 	} else {
-		// --- Databases (ATP = operational OLTP, ADW = analytics) ---
 		ctx := context.Background()
-		atpDB, err := platform.NewOracleDB(ctx, cfg.ATPDSN)
-		if err != nil {
-			logger.Fatalf("failed to connect to ATP database: %v", err)
+
+		switch cfg.DBDriver {
+		case "postgres":
+			logger.Infof("connecting to PostgreSQL at %s:%s/%s", cfg.DBHost, cfg.DBPort, cfg.DBName)
+			pgDB, err := platform.NewPostgresDB(ctx, cfg.PostgresDSN())
+			if err != nil {
+				logger.Fatalf("failed to connect to PostgreSQL: %v", err)
+			}
+			defer func() { _ = pgDB.Close() }()
+
+			expRepo = pgRepo.NewExperienceRepo(pgDB)
+			projectRepo = pgRepo.NewProjectRepo(pgDB)
+			postRepo = pgRepo.NewPostRepo(pgDB)
+			tagRepo = pgRepo.NewTagRepo(pgDB)
+			assetRepo = pgRepo.NewAssetRepo(pgDB)
+			adminRepo = pgRepo.NewAdminRepo(pgDB)
+			statsRepo = pgRepo.NewStatsRepo(pgDB)
+			profileRepo = pgRepo.NewProfileRepo(pgDB)
+			analyticsStore = pgRepo.NewAnalyticsStore(pgDB)
+			healthH = handler.NewHealthHandler(pgDB, nil)
+
+		default: // "oracle"
+			logger.Infof("connecting to Oracle ATP at %s:%s/%s", cfg.DBHost, cfg.DBPort, cfg.DBName)
+			atpDB, err := platform.NewOracleDB(ctx, cfg.OracleDSN())
+			if err != nil {
+				logger.Fatalf("failed to connect to ATP database: %v", err)
+			}
+			defer func() { _ = atpDB.Close() }()
+
+			analyticsDSN := cfg.OracleAnalyticsDSN()
+			logger.Info("connecting to Oracle ADW analytics database")
+			adwDB, err := platform.NewOracleDB(ctx, analyticsDSN)
+			if err != nil {
+				logger.Fatalf("failed to connect to ADW database: %v", err)
+			}
+			defer func() { _ = adwDB.Close() }()
+
+			expRepo = atp.NewExperienceRepo(atpDB)
+			projectRepo = atp.NewProjectRepo(atpDB)
+			postRepo = atp.NewPostRepo(atpDB)
+			tagRepo = atp.NewTagRepo(atpDB)
+			assetRepo = atp.NewAssetRepo(atpDB)
+			adminRepo = atp.NewAdminRepo(atpDB)
+			statsRepo = atp.NewStatsRepo(atpDB)
+			profileRepo = atp.NewProfileRepo(atpDB)
+			analyticsStore = adw.NewAnalyticsStore(adwDB)
+			healthH = handler.NewHealthHandler(atpDB, adwDB)
 		}
-		defer func() { _ = atpDB.Close() }()
 
-		adwDB, err := platform.NewOracleDB(ctx, cfg.ADWDSN)
-		if err != nil {
-			logger.Fatalf("failed to connect to ADW database: %v", err)
-		}
-		defer func() { _ = adwDB.Close() }()
-
-		expRepo = atp.NewExperienceRepo(atpDB)
-		projectRepo = atp.NewProjectRepo(atpDB)
-		postRepo = atp.NewPostRepo(atpDB)
-		tagRepo = atp.NewTagRepo(atpDB)
-		assetRepo = atp.NewAssetRepo(atpDB)
-		adminRepo = atp.NewAdminRepo(atpDB)
-		statsRepo = atp.NewStatsRepo(atpDB)
-		profileRepo = atp.NewProfileRepo(atpDB)
-
-		analyticsStore = adw.NewAnalyticsStore(adwDB)
-
+		// --- Asset Store (independent of DB driver) ---
 		if cfg.StorageDriver == "local" {
 			localStore, err := localstorage.NewAssetStore(cfg.LocalStorageDir, cfg.LocalStorageBaseURL)
 			if err != nil {
@@ -117,8 +144,6 @@ func main() {
 			}
 			assetStore = store
 		}
-
-		healthH = handler.NewHealthHandler(atpDB, adwDB)
 	}
 
 	// --- Services (use-cases) ---

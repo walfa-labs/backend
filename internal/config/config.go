@@ -12,14 +12,30 @@ type Config struct {
 	AppEnv  string `env:"APP_ENV" envDefault:"development"`
 	AppPort string `env:"APP_PORT" envDefault:":8080"`
 
-	// ATPDSN is the godror connect string for Autonomous Transaction
-	// Processing (operational OLTP store), e.g. "user/password@dbname_high"
-	// or "user/password@host:port/service_name" for local Oracle DB.
-	ATPDSN string `env:"ATP_DSN,required"`
-	// ADWDSN is the godror connect string for Autonomous Data Warehouse
-	// (analytics store), e.g. "user/password@dbname_high"
-	// or "user/password@host:port/service_name" for local Oracle DB.
-	ADWDSN string `env:"ADW_DSN,required"`
+	// DBDriver selects the database backend: "oracle" or "postgres".
+	DBDriver string `env:"DB_DRIVER" envDefault:"oracle"`
+
+	// Primary (OLTP) database connection parameters.
+	DBHost     string `env:"DB_HOST" envDefault:"localhost"`
+	DBPort     string `env:"DB_PORT" envDefault:"1521"`
+	DBUser     string `env:"DB_USER,required"`
+	DBPassword string `env:"DB_PASSWORD,required"`
+	// DBName is the Oracle service name (e.g. "FREEPDB1") or PostgreSQL database name.
+	DBName    string `env:"DB_NAME,required"`
+	DBSSLMode string `env:"DB_SSLMODE" envDefault:"disable"`
+
+	// Analytics (OLAP) database connection parameters — Oracle only.
+	// When DB_DRIVER=postgres, the analytics store reuses the primary DB connection.
+	// When DB_DRIVER=oracle and ANALYTICS_DB_HOST is empty, also reuses the primary connection.
+	AnalyticsDBHost     string `env:"ANALYTICS_DB_HOST"`
+	AnalyticsDBPort     string `env:"ANALYTICS_DB_PORT"`
+	AnalyticsDBUser     string `env:"ANALYTICS_DB_USER"`
+	AnalyticsDBPassword string `env:"ANALYTICS_DB_PASSWORD"`
+	AnalyticsDBName     string `env:"ANALYTICS_DB_NAME"`
+
+	// golang-migrate connection URLs (used only by the migrate-* Taskfile tasks).
+	MigrateURL          string `env:"MIGRATE_URL"`
+	MigrateAnalyticsURL string `env:"MIGRATE_ANALYTICS_URL"`
 
 	JWTSecretKey  string        `env:"JWT_SECRET,required"`
 	JWTAccessTTL  time.Duration `env:"JWT_ACCESS_TTL" envDefault:"15m"`
@@ -55,6 +71,13 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("config: %w", err)
 	}
 
+	switch cfg.DBDriver {
+	case "oracle", "postgres":
+		// valid
+	default:
+		return nil, fmt.Errorf("config: DB_DRIVER must be \"oracle\" or \"postgres\", got %q", cfg.DBDriver)
+	}
+
 	if cfg.StorageDriver == "oci" {
 		if cfg.OCI.TenancyOCID == "" || cfg.OCI.UserOCID == "" || cfg.OCI.Fingerprint == "" ||
 			cfg.OCI.Region == "" || cfg.OCI.PrivateKeyPath == "" || cfg.OCI.Bucket == "" {
@@ -63,6 +86,44 @@ func Load() (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+// OracleDSN builds a godror connect string: "user/password@host:port/service_name".
+func (c *Config) OracleDSN() string {
+	return fmt.Sprintf("%s/%s@%s:%s/%s", c.DBUser, c.DBPassword, c.DBHost, c.DBPort, c.DBName)
+}
+
+// OracleAnalyticsDSN builds the godror connect string for the analytics (ADW) database.
+// Falls back to the primary DSN when ANALYTICS_DB_HOST is not set.
+func (c *Config) OracleAnalyticsDSN() string {
+	host := c.AnalyticsDBHost
+	if host == "" {
+		return c.OracleDSN()
+	}
+	port := c.AnalyticsDBPort
+	if port == "" {
+		port = c.DBPort
+	}
+	user := c.AnalyticsDBUser
+	if user == "" {
+		user = c.DBUser
+	}
+	pass := c.AnalyticsDBPassword
+	if pass == "" {
+		pass = c.DBPassword
+	}
+	name := c.AnalyticsDBName
+	if name == "" {
+		name = c.DBName
+	}
+	return fmt.Sprintf("%s/%s@%s:%s/%s", user, pass, host, port, name)
+}
+
+// PostgresDSN builds a PostgreSQL connection URL:
+// "postgres://user:password@host:port/dbname?sslmode=mode".
+func (c *Config) PostgresDSN() string {
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		c.DBUser, c.DBPassword, c.DBHost, c.DBPort, c.DBName, c.DBSSLMode)
 }
 
 // IsProduction returns true if the app is running in production mode.

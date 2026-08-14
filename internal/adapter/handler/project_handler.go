@@ -130,4 +130,3 @@ func (h *ProjectHandler) Delete(c fiber.Ctx) error {
 	}
 	return NoContent(c)
 }
-

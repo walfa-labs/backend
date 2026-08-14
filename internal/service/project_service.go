@@ -135,10 +135,10 @@ func applyProjectInput(p *domain.Project, input port.ProjectInput) {
 	p.Links = make([]domain.ProjectLink, len(input.Links))
 	for i, l := range input.Links {
 		p.Links[i] = domain.ProjectLink{
-			ID:        uuid.New(),
-			Label:     l.Label,
-			URL:       l.URL,
-			Kind:      l.Kind,
+			ID:    uuid.New(),
+			Label: l.Label,
+			URL:   l.URL,
+			Kind:  l.Kind,
 		}
 	}
 	p.UpdatedAt = time.Now()

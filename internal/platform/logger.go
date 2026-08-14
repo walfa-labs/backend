@@ -1,9 +1,9 @@
 package platform
 
 import (
+	"github.com/gookit/rotatefile"
 	"github.com/gookit/slog"
 	"github.com/gookit/slog/handler"
-	"github.com/gookit/rotatefile"
 )
 
 // NewLogger creates a production-ready slog.Logger.

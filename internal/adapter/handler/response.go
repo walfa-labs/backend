@@ -7,7 +7,7 @@ import (
 
 // SuccessEnvelope wraps a successful response per the design doc §4.5.3.
 type SuccessEnvelope struct {
-	Data any  `json:"data"`
+	Data any   `json:"data"`
 	Meta *Meta `json:"meta,omitempty"`
 }
 
@@ -25,8 +25,8 @@ type ErrorEnvelope struct {
 
 // ErrorBody is the error detail payload.
 type ErrorBody struct {
-	Code    string             `json:"code"`
-	Message string             `json:"message"`
+	Code    string              `json:"code"`
+	Message string              `json:"message"`
 	Details []domain.FieldError `json:"details,omitempty"`
 }
 

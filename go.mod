@@ -13,6 +13,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gookit/rotatefile v0.3.0
 	github.com/gookit/slog v0.7.1
+	github.com/jackc/pgx/v5 v5.10.0
 	github.com/oracle/oci-go-sdk/v65 v65.123.0
 	golang.org/x/crypto v0.54.0
 )
@@ -35,6 +36,9 @@ require (
 	github.com/gookit/color v1.6.1 // indirect
 	github.com/gookit/goutil v0.7.6 // indirect
 	github.com/gookit/gsr v0.1.1 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/klauspost/compress v1.19.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.11 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect

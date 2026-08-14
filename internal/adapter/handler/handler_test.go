@@ -274,7 +274,7 @@ func (m *mockTagRepo) GetOrCreate(ctx context.Context, name, slug string) (*doma
 type mockAnalyticsStore struct{}
 
 func (m *mockAnalyticsStore) RecordPostView(ctx context.Context, v port.PostView) error { return nil }
-func (m *mockAnalyticsStore) TotalViews(ctx context.Context) (int64, error)               { return 100, nil }
+func (m *mockAnalyticsStore) TotalViews(ctx context.Context) (int64, error)             { return 100, nil }
 func (m *mockAnalyticsStore) ViewsTimeSeries(ctx context.Context, from, to time.Time, bucket string) ([]port.ViewsBucket, error) {
 	return []port.ViewsBucket{{Bucket: time.Now(), Views: 50}}, nil
 }

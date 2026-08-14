@@ -29,15 +29,15 @@ func (s *ProfileService) Update(ctx context.Context, input port.ProfileInput) (*
 		return nil, domain.NewValidationError("name", "required")
 	}
 	p := &domain.Profile{
-		Name:         input.Name,
-		Email:        input.Email,
-		Tagline:      input.Tagline,
-		BioMarkdown:  input.BioMarkdown,
-		Location:     input.Location,
-		AvatarURL:    input.AvatarURL,
-		GitHubURL:    input.GitHubURL,
-		LinkedInURL:  input.LinkedInURL,
-		TwitterURL:   input.TwitterURL,
+		Name:        input.Name,
+		Email:       input.Email,
+		Tagline:     input.Tagline,
+		BioMarkdown: input.BioMarkdown,
+		Location:    input.Location,
+		AvatarURL:   input.AvatarURL,
+		GitHubURL:   input.GitHubURL,
+		LinkedInURL: input.LinkedInURL,
+		TwitterURL:  input.TwitterURL,
 	}
 	if err := s.repo.Upsert(ctx, p); err != nil {
 		return nil, err

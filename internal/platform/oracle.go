@@ -1,3 +1,4 @@
+// Package platform provides infrastructure factories for the Portfolio API.
 package platform
 
 import (

@@ -180,21 +180,41 @@ tasks:
   # ============================================================================
 
   migrate-up:
-    desc: "Apply all database migrations to ATP then ADW (MIGRATE_*_URL from .env; wallet via TNS_ADMIN)"
+    desc: "Apply all migrations (driver-aware: uses MIGRATE_URL from .env; for Oracle also MIGRATE_ANALYTICS_URL)"
     cmds:
-      - migrate -path migrations/atp -database "{{.MIGRATE_ATP_URL}}" up
-      - migrate -path migrations/adw -database "{{.MIGRATE_ADW_URL}}" up
+      - task: migrate-up:{{.DB_DRIVER}}
 
   migrate-down:
-    desc: "Roll back all database migrations on ADW then ATP (MIGRATE_*_URL from .env)"
+    desc: "Roll back all migrations (driver-aware: uses MIGRATE_URL from .env; for Oracle also MIGRATE_ANALYTICS_URL)"
     cmds:
-      - migrate -path migrations/adw -database "{{.MIGRATE_ADW_URL}}" down
-      - migrate -path migrations/atp -database "{{.MIGRATE_ATP_URL}}" down
+      - task: migrate-down:{{.DB_DRIVER}}
+
+  migrate-up:postgres:
+    desc: "Apply all PostgreSQL migrations (MIGRATE_URL from .env)"
+    cmds:
+      - migrate -path migrations/postgres -database "{{.MIGRATE_URL}}" up
+
+  migrate-down:postgres:
+    desc: "Roll back all PostgreSQL migrations (MIGRATE_URL from .env)"
+    cmds:
+      - migrate -path migrations/postgres -database "{{.MIGRATE_URL}}" down
+
+  migrate-up:oracle:
+    desc: "Apply all Oracle migrations to ATP then ADW (MIGRATE_URL and MIGRATE_ANALYTICS_URL from .env)"
+    cmds:
+      - migrate -path migrations/atp -database "{{.MIGRATE_URL}}" up
+      - migrate -path migrations/adw -database "{{.MIGRATE_ANALYTICS_URL}}" up
+
+  migrate-down:oracle:
+    desc: "Roll back all Oracle migrations on ADW then ATP (MIGRATE_URL and MIGRATE_ANALYTICS_URL from .env)"
+    cmds:
+      - migrate -path migrations/adw -database "{{.MIGRATE_ANALYTICS_URL}}" down
+      - migrate -path migrations/atp -database "{{.MIGRATE_URL}}" down
 
   seed:
-    desc: "Load demo data into ATP from migrations/seed.sql (requires SQLcl; wallet via TNS_ADMIN)"
+    desc: "Load demo data (PostgreSQL: psql, Oracle: SQLcl)"
     cmds:
-      - sql "{{.ATP_DSN}}" @migrations/seed.sql
+      - cmd /c "if \"{{.DB_DRIVER}}\" == \"postgres\" (psql \"{{.MIGRATE_URL}}\" -f migrations/seed.sql) else (sql \"{{.MIGRATE_URL}}\" @migrations/seed_ora.sql)"
 
   # ============================================================================
   # Tooling Installation
@@ -207,4 +227,4 @@ tasks:
       - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
       - go install github.com/securego/gosec/v2/cmd/gosec@latest
       - go install golang.org/x/vuln/cmd/govulncheck@latest
-      - go install -tags 'oracle' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+      - go install -tags 'oracle postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest

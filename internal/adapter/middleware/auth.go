@@ -14,8 +14,8 @@ import (
 // AdminClaims is the JWT claims payload for an authenticated admin user.
 // It embeds jwt.RegisteredClaims for standard fields (sub, exp, iat, jti).
 type AdminClaims struct {
-	AdminID   uuid.UUID `json:"admin_id"`
-	Username  string    `json:"username"`
+	AdminID  uuid.UUID `json:"admin_id"`
+	Username string    `json:"username"`
 	jwt.RegisteredClaims
 }
 

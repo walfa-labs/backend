@@ -11,18 +11,18 @@ import (
 
 // BlogPost is a blog article authored via the CMS.
 type BlogPost struct {
-	ID             uuid.UUID
-	Slug           string
-	Title          string
-	Excerpt        string
-	BodyMarkdown   string
-	CoverImageURL  string
-	Status         ContentStatus
-	ViewCount      int
-	PublishedAt    *time.Time
-	Tags           []Tag
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID            uuid.UUID
+	Slug          string
+	Title         string
+	Excerpt       string
+	BodyMarkdown  string
+	CoverImageURL string
+	Status        ContentStatus
+	ViewCount     int
+	PublishedAt   *time.Time
+	Tags          []Tag
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 // ETag returns a weak ETag derived from UpdatedAt, suitable for If-None-Match.

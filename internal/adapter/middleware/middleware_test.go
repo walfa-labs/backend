@@ -349,4 +349,3 @@ func TestSecurityHeaders(t *testing.T) {
 		t.Errorf("expected Cross-Origin-Resource-Policy: cross-origin, got %s", resp.Header.Get("Cross-Origin-Resource-Policy"))
 	}
 }
-

@@ -10,7 +10,7 @@ import (
 
 // AuthHandler handles login and token refresh requests.
 type AuthHandler struct {
-	svc         port.AuthService
+	svc             port.AuthService
 	refreshTTLHours int
 }
 

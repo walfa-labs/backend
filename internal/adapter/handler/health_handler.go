@@ -39,4 +39,3 @@ func (h *HealthHandler) Health(c fiber.Ctx) error {
 		"db":     dbStatus,
 	})
 }
-

@@ -24,9 +24,9 @@ func Recover(logger *slog.Logger) fiber.Handler {
 
 				err = c.Status(fiber.StatusInternalServerError).JSON(ErrorEnvelope{
 					Error: ErrorBody{
-						Code:    CodeInternalError,
-						Message: "an internal server error occurred",
-						Details: nil,
+						Code:      CodeInternalError,
+						Message:   "an internal server error occurred",
+						Details:   nil,
 						RequestID: RequestIDFromContext(c),
 					},
 				})

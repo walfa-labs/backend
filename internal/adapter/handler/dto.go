@@ -11,17 +11,17 @@ import (
 
 // ExperienceResponse is the API representation of an experience.
 type ExperienceResponse struct {
-	ID              string                   `json:"id"`
-	ExperienceType  string                   `json:"experienceType"`
-	Organization    string                   `json:"organization"`
-	RoleTitle       string                   `json:"roleTitle"`
-	Location        string                   `json:"location"`
-	StartDate       string                   `json:"startDate"`
-	EndDate         *string                  `json:"endDate"`
-	Current         bool                     `json:"current"`
-	SummaryMarkdown string                   `json:"summaryMarkdown"`
-	SortOrder       int                      `json:"sortOrder"`
-	Highlights      []HighlightResponse     `json:"highlights"`
+	ID              string              `json:"id"`
+	ExperienceType  string              `json:"experienceType"`
+	Organization    string              `json:"organization"`
+	RoleTitle       string              `json:"roleTitle"`
+	Location        string              `json:"location"`
+	StartDate       string              `json:"startDate"`
+	EndDate         *string             `json:"endDate"`
+	Current         bool                `json:"current"`
+	SummaryMarkdown string              `json:"summaryMarkdown"`
+	SortOrder       int                 `json:"sortOrder"`
+	Highlights      []HighlightResponse `json:"highlights"`
 }
 
 // HighlightResponse is the API representation of an experience highlight.
@@ -59,16 +59,16 @@ func toExperienceResponse(e *domain.Experience) ExperienceResponse {
 }
 
 type experienceRequest struct {
-	ExperienceType  string              `json:"experienceType" validate:"required,oneof=work education"`
-	Organization    string              `json:"organization" validate:"required"`
-	RoleTitle       string              `json:"roleTitle" validate:"required"`
-	Location        string              `json:"location"`
-	StartDate       string              `json:"startDate" validate:"required"`
-	EndDate         *string             `json:"endDate"`
-	Current         bool                `json:"current"`
-	SummaryMarkdown string              `json:"summaryMarkdown"`
-	SortOrder       int                 `json:"sortOrder"`
-	Highlights      []highlightRequest  `json:"highlights"`
+	ExperienceType  string             `json:"experienceType" validate:"required,oneof=work education"`
+	Organization    string             `json:"organization" validate:"required"`
+	RoleTitle       string             `json:"roleTitle" validate:"required"`
+	Location        string             `json:"location"`
+	StartDate       string             `json:"startDate" validate:"required"`
+	EndDate         *string            `json:"endDate"`
+	Current         bool               `json:"current"`
+	SummaryMarkdown string             `json:"summaryMarkdown"`
+	SortOrder       int                `json:"sortOrder"`
+	Highlights      []highlightRequest `json:"highlights"`
 }
 
 type highlightRequest struct {
@@ -114,20 +114,20 @@ func (r experienceRequest) toInput() (port.ExperienceInput, error) {
 
 // ProjectResponse is the API representation of a project.
 type ProjectResponse struct {
-	ID                  string           `json:"id"`
-	Slug                string           `json:"slug"`
-	Title               string           `json:"title"`
-	Tagline             string           `json:"tagline"`
-	DescriptionMarkdown string           `json:"descriptionMarkdown"`
-	CoverImageURL       string           `json:"coverImageUrl"`
-	RepoURL             string           `json:"repoUrl"`
-	DemoURL             string           `json:"demoUrl"`
-	TechStack           []string         `json:"techStack"`
-	Status              string           `json:"status"`
-	Featured            bool             `json:"featured"`
-	SortOrder           int              `json:"sortOrder"`
-	PublishedAt         *string          `json:"publishedAt"`
-	Links               []LinkResponse   `json:"links"`
+	ID                  string         `json:"id"`
+	Slug                string         `json:"slug"`
+	Title               string         `json:"title"`
+	Tagline             string         `json:"tagline"`
+	DescriptionMarkdown string         `json:"descriptionMarkdown"`
+	CoverImageURL       string         `json:"coverImageUrl"`
+	RepoURL             string         `json:"repoUrl"`
+	DemoURL             string         `json:"demoUrl"`
+	TechStack           []string       `json:"techStack"`
+	Status              string         `json:"status"`
+	Featured            bool           `json:"featured"`
+	SortOrder           int            `json:"sortOrder"`
+	PublishedAt         *string        `json:"publishedAt"`
+	Links               []LinkResponse `json:"links"`
 }
 
 // LinkResponse is the API representation of a project link.
@@ -173,18 +173,18 @@ func toProjectResponse(p *domain.Project) ProjectResponse {
 }
 
 type projectRequest struct {
-	Slug                string         `json:"slug" validate:"required"`
-	Title               string         `json:"title" validate:"required"`
-	Tagline             string         `json:"tagline"`
-	DescriptionMarkdown string         `json:"descriptionMarkdown"`
-	CoverImageURL       string         `json:"coverImageUrl"`
-	RepoURL             string         `json:"repoUrl"`
-	DemoURL             string         `json:"demoUrl"`
-	TechStack           []string       `json:"techStack"`
-	Status              string         `json:"status" validate:"oneof=draft published"`
-	Featured            bool           `json:"featured"`
-	SortOrder           int            `json:"sortOrder"`
-	Links              []linkRequest   `json:"links"`
+	Slug                string        `json:"slug" validate:"required"`
+	Title               string        `json:"title" validate:"required"`
+	Tagline             string        `json:"tagline"`
+	DescriptionMarkdown string        `json:"descriptionMarkdown"`
+	CoverImageURL       string        `json:"coverImageUrl"`
+	RepoURL             string        `json:"repoUrl"`
+	DemoURL             string        `json:"demoUrl"`
+	TechStack           []string      `json:"techStack"`
+	Status              string        `json:"status" validate:"oneof=draft published"`
+	Featured            bool          `json:"featured"`
+	SortOrder           int           `json:"sortOrder"`
+	Links               []linkRequest `json:"links"`
 }
 
 type linkRequest struct {
@@ -230,12 +230,12 @@ func (r projectRequest) toInput() (port.ProjectInput, error) {
 
 // PostSummaryResponse is the API representation of a post summary.
 type PostSummaryResponse struct {
-	ID            string      `json:"id"`
-	Slug          string      `json:"slug"`
-	Title         string      `json:"title"`
-	Excerpt       string      `json:"excerpt"`
-	CoverImageURL string      `json:"coverImageUrl"`
-	PublishedAt   *string     `json:"publishedAt"`
+	ID            string        `json:"id"`
+	Slug          string        `json:"slug"`
+	Title         string        `json:"title"`
+	Excerpt       string        `json:"excerpt"`
+	CoverImageURL string        `json:"coverImageUrl"`
+	PublishedAt   *string       `json:"publishedAt"`
 	Tags          []TagResponse `json:"tags"`
 }
 
@@ -298,13 +298,13 @@ func toPostResponse(p *domain.BlogPost) PostResponse {
 }
 
 type postRequest struct {
-	Slug          string      `json:"slug" validate:"required"`
-	Title         string      `json:"title" validate:"required"`
-	Excerpt       string      `json:"excerpt"`
-	BodyMarkdown  string      `json:"bodyMarkdown"`
-	CoverImageURL string      `json:"coverImageUrl"`
-	Status        string      `json:"status" validate:"oneof=draft published"`
-	Tags          []tagInput  `json:"tags"`
+	Slug          string     `json:"slug" validate:"required"`
+	Title         string     `json:"title" validate:"required"`
+	Excerpt       string     `json:"excerpt"`
+	BodyMarkdown  string     `json:"bodyMarkdown"`
+	CoverImageURL string     `json:"coverImageUrl"`
+	Status        string     `json:"status" validate:"oneof=draft published"`
+	Tags          []tagInput `json:"tags"`
 }
 
 type tagInput struct {
