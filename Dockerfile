@@ -4,16 +4,25 @@
 # --- Build Stage ---
 FROM oraclelinux:9-slim AS builder
 
-# Prepare yum vars and install Oracle Instant Client 19c SDK, Go, and GCC
+# Prepare yum vars and install Oracle Instant Client 19c SDK and GCC.
+# Go is installed from the official tarball (checksum-pinned) because the
+# distro `golang` package lags behind the go.mod required toolchain.
 RUN mkdir -p /etc/yum/vars && \
     microdnf install -y oracle-instantclient-release-el9 && \
     microdnf install -y \
         oracle-instantclient19.19-basic \
         oracle-instantclient19.19-devel \
-        golang \
+        curl \
         gcc \
         git && \
-    microdnf clean all
+    microdnf clean all && \
+    curl -fsSLo /tmp/go.tgz https://go.dev/dl/go1.26.6.linux-amd64.tar.gz && \
+    echo "708effb774be8237570d0add163225abbdfaf4fca28b2611df167beba4feef89  /tmp/go.tgz" | sha256sum -c - && \
+    rm -rf /usr/local/go && \
+    tar -C /usr/local -xzf /tmp/go.tgz && \
+    rm /tmp/go.tgz
+
+ENV PATH="/usr/local/go/bin:${PATH}"
 
 WORKDIR /build
 
