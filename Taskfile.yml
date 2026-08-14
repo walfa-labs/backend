@@ -197,7 +197,7 @@ tasks:
   migrate-down:postgres:
     desc: "Roll back all PostgreSQL migrations (MIGRATE_URL from .env)"
     cmds:
-      - migrate -path migrations/postgres -database "{{.MIGRATE_URL}}" down
+      - migrate -path migrations/postgres -database "{{.MIGRATE_URL}}" down -all
 
   migrate-up:oracle:
     desc: "Apply all Oracle migrations to ATP then ADW (MIGRATE_URL and MIGRATE_ANALYTICS_URL from .env)"
@@ -208,13 +208,18 @@ tasks:
   migrate-down:oracle:
     desc: "Roll back all Oracle migrations on ADW then ATP (MIGRATE_URL and MIGRATE_ANALYTICS_URL from .env)"
     cmds:
-      - migrate -path migrations/adw -database "{{.MIGRATE_ANALYTICS_URL}}" down
-      - migrate -path migrations/atp -database "{{.MIGRATE_URL}}" down
+      - migrate -path migrations/adw -database "{{.MIGRATE_ANALYTICS_URL}}" down -all
+      - migrate -path migrations/atp -database "{{.MIGRATE_URL}}" down -all
 
   seed:
-    desc: "Load demo data (PostgreSQL: psql, Oracle: SQLcl)"
+    desc: "Load demo data (PostgreSQL: psql or docker exec, Oracle: SQLcl)"
     cmds:
-      - cmd /c "if \"{{.DB_DRIVER}}\" == \"postgres\" (psql \"{{.MIGRATE_URL}}\" -f migrations/seed.sql) else (sql \"{{.MIGRATE_URL}}\" @migrations/seed_ora.sql)"
+      - cmd /c "if \"{{.DB_DRIVER}}\" == \"postgres\" (where psql >nul 2>&1 && psql \"{{.MIGRATE_URL}}\" -f migrations/seed.sql || docker exec -i portfolio-postgres psql -U {{.DB_USER}} -d {{.DB_NAME}} < migrations/seed.sql) else (sql \"{{.MIGRATE_URL}}\" @migrations/seed_ora.sql)"
+
+  admin:regen:
+    desc: "Regenerate admin user credentials (random password or pass args: task admin:regen -- -password=mySecret)"
+    cmds:
+      - go run ./cmd/admin {{.CLI_ARGS}}
 
   # ============================================================================
   # Tooling Installation

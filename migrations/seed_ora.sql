@@ -113,3 +113,7 @@ UPDATE profiles SET
   twitter_url = 'https://twitter.com/walfa',
   updated_at = CURRENT_TIMESTAMP
 WHERE profile_id = 1;
+
+-- Admin user (admin / admin123)
+INSERT INTO admin_users (admin_user_id, username, password_hash) VALUES
+  ('00000000-0000-0000-0000-000000000001', 'admin', '$2a$10$Qwz/cxG0s36.a/3nwRf7kuvYI9/V.5ab0Y8C6LNE723211RNOsbdO');

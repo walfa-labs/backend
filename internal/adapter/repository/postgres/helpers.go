@@ -44,10 +44,23 @@ func nullStr(ns sql.NullString) string {
 	return ""
 }
 
-// nullTime unwraps a sql.NullTime, returning nil for NULL timestamps.
+// nullTime converts a nullable Oracle timestamp to *time.Time (nil when NULL).
 func nullTime(nt sql.NullTime) *time.Time {
 	if nt.Valid {
 		return &nt.Time
 	}
 	return nil
 }
+
+// isUniqueViolation checks if an error indicates a unique constraint violation (SQLSTATE 23505).
+func isUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "23505") ||
+		strings.Contains(msg, "duplicate key") ||
+		strings.Contains(msg, "unique constraint") ||
+		strings.Contains(msg, "violates unique")
+}
+

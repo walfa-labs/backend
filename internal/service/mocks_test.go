@@ -38,6 +38,13 @@ func (m *MockAdminRepo) AddUser(u *domain.AdminUser) {
 	m.users[u.Username] = u
 }
 
+func (m *MockAdminRepo) Upsert(ctx context.Context, u *domain.AdminUser) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.users[u.Username] = u
+	return nil
+}
+
 // MockExperienceRepo implements port.ExperienceRepo
 type MockExperienceRepo struct {
 	mu   sync.RWMutex

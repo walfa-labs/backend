@@ -50,3 +50,10 @@ Thumbs.db
 
 # Build
 /tmp/
+
+# Uploads
+uploads/
+
+
+# Local asset uploads
+/uploads/

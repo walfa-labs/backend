@@ -216,6 +216,9 @@ func (r *ProjectRepo) Create(ctx context.Context, p *domain.Project) error {
 		p.RepoURL, p.DemoURL, techStack, string(p.Status), p.Featured, p.SortOrder, p.PublishedAt,
 	)
 	if err != nil {
+		if isUniqueViolation(err) {
+			return domain.ErrConflict
+		}
 		return err
 	}
 
@@ -257,6 +260,9 @@ func (r *ProjectRepo) Update(ctx context.Context, p *domain.Project) error {
 		p.PublishedAt, p.ID.String(),
 	)
 	if err != nil {
+		if isUniqueViolation(err) {
+			return domain.ErrConflict
+		}
 		return err
 	}
 	if affected, err := res.RowsAffected(); err == nil && affected == 0 {

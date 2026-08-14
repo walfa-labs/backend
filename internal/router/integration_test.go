@@ -39,6 +39,11 @@ func (m *mockAdminRepo) GetByUsername(ctx context.Context, username string) (*do
 	return nil, domain.ErrNotFound
 }
 
+func (m *mockAdminRepo) Upsert(ctx context.Context, u *domain.AdminUser) error {
+	m.user = u
+	return nil
+}
+
 type mockExpRepo struct {
 	mu   sync.RWMutex
 	data map[uuid.UUID]domain.Experience

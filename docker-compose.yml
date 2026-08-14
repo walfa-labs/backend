@@ -1,4 +1,23 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: portfolio-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=portfolio
+      - POSTGRES_PASSWORD=devpassword
+      - POSTGRES_DB=portfolio
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portfolio -d portfolio"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
   oracle-db:
     image: gvenzl/oracle-free:23-slim-faststart
     container_name: portfolio-oracle-db
@@ -31,18 +50,23 @@ services:
     environment:
       - APP_ENV=production
       - APP_PORT=:8080
-      - ATP_DSN=portfolio_atp/devpassword@oracle-db:1521/FREEPDB1
-      - ADW_DSN=portfolio_adw/devpassword@oracle-db:1521/FREEPDB1
+      - DB_DRIVER=postgres
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=portfolio
+      - DB_PASSWORD=devpassword
+      - DB_NAME=portfolio
+      - DB_SSLMODE=disable
       - STORAGE_DRIVER=local
       - STORAGE_LOCAL_DIR=/app/uploads
       - STORAGE_BASE_URL=http://localhost:8080/uploads
       - JWT_SECRET=dev-secret-change-me
       - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD_HASH=$$2a$$10$$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
+      - ADMIN_PASSWORD_HASH=$$2a$$10$$Qwz/cxG0s36.a/3nwRf7kuvYI9/V.5ab0Y8C6LNE723211RNOsbdO
     volumes:
       - ./uploads:/app/uploads
     depends_on:
-      oracle-db:
+      postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
@@ -68,4 +92,5 @@ services:
     command: zap-api-scan.py -t /zap/wrk/openapi.yaml -f openapi -u http://backend:8080 -r dast-report.html -c /zap/config/rules.tsv
 
 volumes:
+  postgres-data:
   oracle-data:

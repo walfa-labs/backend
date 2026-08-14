@@ -81,3 +81,14 @@ func nullTime(nt sql.NullTime) *time.Time {
 func clob(s string) godror.Lob {
 	return godror.Lob{Reader: strings.NewReader(s), IsClob: true}
 }
+
+// isUniqueViolation checks if an error indicates a unique constraint violation (ORA-00001).
+func isUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "ora-00001") ||
+		strings.Contains(msg, "unique constraint")
+}
+

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/walfa-labs/backend/internal/domain"
@@ -262,6 +263,9 @@ func (r *PostRepo) Create(ctx context.Context, p *domain.BlogPost) error {
 		string(p.Status), p.ViewCount, p.PublishedAt,
 	)
 	if err != nil {
+		if isUniqueViolation(err) {
+			return domain.ErrConflict
+		}
 		return err
 	}
 
@@ -296,6 +300,9 @@ func (r *PostRepo) Update(ctx context.Context, p *domain.BlogPost) error {
 		string(p.Status), p.ViewCount, p.PublishedAt, p.ID.String(),
 	)
 	if err != nil {
+		if isUniqueViolation(err) {
+			return domain.ErrConflict
+		}
 		return err
 	}
 	if affected, err := res.RowsAffected(); err == nil && affected == 0 {
@@ -365,9 +372,62 @@ func (r *PostRepo) syncPostTags(ctx context.Context, tx *sql.Tx, postID uuid.UUI
 	if _, err := tx.ExecContext(ctx, `DELETE FROM post_tags WHERE blog_post_id = $1`, postID.String()); err != nil {
 		return err
 	}
+	seen := make(map[string]bool)
 	for _, t := range tags {
-		_, err := tx.ExecContext(ctx,
-			`INSERT INTO post_tags (blog_post_id, tag_id) VALUES ($1, $2)`, postID.String(), t.ID.String())
+		slug := strings.TrimSpace(t.Slug)
+		name := strings.TrimSpace(t.Name)
+		if slug == "" && name == "" {
+			continue
+		}
+		if slug == "" {
+			slug = strings.ToLower(strings.ReplaceAll(name, " ", "-"))
+		}
+		if name == "" {
+			name = slug
+		}
+		dedupKey := strings.ToLower(slug)
+		if seen[dedupKey] {
+			continue
+		}
+		seen[dedupKey] = true
+
+		var tagID string
+		// 1. Try to find existing tag by slug or case-insensitive name
+		err := tx.QueryRowContext(ctx, `
+			SELECT tag_id FROM tags WHERE slug = $1 OR LOWER(name) = LOWER($2) LIMIT 1`,
+			slug, name,
+		).Scan(&tagID)
+
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				// 2. Tag does not exist, insert it
+				newID := uuid.New().String()
+				err = tx.QueryRowContext(ctx, `
+					INSERT INTO tags (tag_id, name, slug)
+					VALUES ($1, $2, $3)
+					ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+					RETURNING tag_id`,
+					newID, name, slug,
+				).Scan(&tagID)
+				if err != nil {
+					// In case of unique conflict on name or race condition, query existing tag_id
+					err = tx.QueryRowContext(ctx, `
+						SELECT tag_id FROM tags WHERE slug = $1 OR LOWER(name) = LOWER($2) LIMIT 1`,
+						slug, name,
+					).Scan(&tagID)
+					if err != nil {
+						return err
+					}
+				}
+			} else {
+				return err
+			}
+		}
+
+		_, err = tx.ExecContext(ctx,
+			`INSERT INTO post_tags (blog_post_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+			postID.String(), tagID,
+		)
 		if err != nil {
 			return err
 		}

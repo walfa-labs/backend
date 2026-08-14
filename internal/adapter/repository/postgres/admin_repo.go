@@ -34,3 +34,15 @@ func (r *AdminRepo) GetByUsername(ctx context.Context, username string) (*domain
 	}
 	return &u, nil
 }
+
+// Upsert inserts or updates the admin user by username.
+func (r *AdminRepo) Upsert(ctx context.Context, u *domain.AdminUser) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO admin_users (admin_user_id, username, password_hash, created_at)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (username) DO UPDATE
+		SET password_hash = EXCLUDED.password_hash`,
+		u.ID, u.Username, u.PasswordHash, u.CreatedAt,
+	)
+	return err
+}

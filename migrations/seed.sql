@@ -15,13 +15,13 @@
 
 -- Experiences
 INSERT INTO experiences (experience_id, experience_type, organization, role_title, location, start_date, end_date, "current", summary_markdown, sort_order) VALUES
-  ('e1111111-1111-4111-8111-111111111111', 'work', 'Google', 'Senior Software Engineer', 'Singapore', DATE '2022-01-01', NULL, 1, 'Building distributed backend systems and leading backend architecture initiatives.', 0);
+  ('e1111111-1111-4111-8111-111111111111', 'work', 'Google', 'Senior Software Engineer', 'Singapore', DATE '2022-01-01', NULL, TRUE, 'Building distributed backend systems and leading backend architecture initiatives.', 0);
 INSERT INTO experiences (experience_id, experience_type, organization, role_title, location, start_date, end_date, "current", summary_markdown, sort_order) VALUES
-  ('e2222222-2222-4222-8222-222222222222', 'work', 'Stripe', 'Software Engineer II', 'Remote', DATE '2019-06-01', DATE '2021-12-31', 0, 'Worked on payment infrastructure processing billions of dollars in transactions.', 1);
+  ('e2222222-2222-4222-8222-222222222222', 'work', 'Stripe', 'Software Engineer II', 'Remote', DATE '2019-06-01', DATE '2021-12-31', FALSE, 'Worked on payment infrastructure processing billions of dollars in transactions.', 1);
 INSERT INTO experiences (experience_id, experience_type, organization, role_title, location, start_date, end_date, "current", summary_markdown, sort_order) VALUES
-  ('e3333333-3333-4333-8333-333333333333', 'work', 'Vercel', 'Software Engineer Intern', 'Remote', DATE '2018-05-01', DATE '2018-08-31', 0, 'Contributed to the Next.js framework and internal tooling.', 2);
+  ('e3333333-3333-4333-8333-333333333333', 'work', 'Vercel', 'Software Engineer Intern', 'Remote', DATE '2018-05-01', DATE '2018-08-31', FALSE, 'Contributed to the Next.js framework and internal tooling.', 2);
 INSERT INTO experiences (experience_id, experience_type, organization, role_title, location, start_date, end_date, "current", summary_markdown, sort_order) VALUES
-  ('e4444444-4444-4444-8444-444444444444', 'education', 'National University of Singapore', 'B.Sc. Computer Science', 'Singapore', DATE '2015-08-01', DATE '2019-05-31', 0, 'First Class Honours. Focus on distributed systems and compilers.', 3);
+  ('e4444444-4444-4444-8444-444444444444', 'education', 'National University of Singapore', 'B.Sc. Computer Science', 'Singapore', DATE '2015-08-01', DATE '2019-05-31', FALSE, 'First Class Honours. Focus on distributed systems and compilers.', 3);
 
 -- Experience highlights
 INSERT INTO experience_highlights (experience_highlight_id, experience_id, body_markdown, sort_order) VALUES
@@ -51,7 +51,7 @@ A high-performance realtime chat engine built in Go, using WebSocket connections
 
 ## Performance
 
-Benchmarked at **10,000 concurrent connections** on a single instance with <50ms message latency.', 'https://github.com/walfa/realtime-chat-go', 'https://chat-demo.walfa.dev', '["Go","WebSocket","Redis","PostgreSQL","Docker"]', 'published', 1, 0, CURRENT_TIMESTAMP);
+Benchmarked at **10,000 concurrent connections** on a single instance with <50ms message latency.', 'https://github.com/walfa/realtime-chat-go', 'https://chat-demo.walfa.dev', '["Go","WebSocket","Redis","PostgreSQL","Docker"]', 'published', TRUE, 0, CURRENT_TIMESTAMP);
 INSERT INTO projects (project_id, slug, title, tagline, description_markdown, repo_url, demo_url, tech_stack, status, featured, sort_order, published_at) VALUES
   ('a2222222-2222-4222-8222-222222222222', 'nuxt-portfolio-cms', 'Portfolio CMS', 'A headless CMS for personal portfolios with SSR frontend and Go backend.', '## Overview
 
@@ -62,7 +62,7 @@ A full-stack portfolio CMS built with Nuxt 4 and Go/Fiber. Features hybrid SSR f
 - Hybrid SSR + SPA rendering
 - JWT auth with refresh tokens
 - Admin dashboard with CRUD for all entities
-- Terminal-style homepage design', 'https://github.com/walfa/nuxt-portfolio-cms', '', '["Nuxt","Go","Fiber","PostgreSQL","TailwindCSS"]', 'published', 1, 1, CURRENT_TIMESTAMP);
+- Terminal-style homepage design', 'https://github.com/walfa/nuxt-portfolio-cms', '', '["Nuxt","Go","Fiber","PostgreSQL","TailwindCSS"]', 'published', TRUE, 1, CURRENT_TIMESTAMP);
 INSERT INTO projects (project_id, slug, title, tagline, description_markdown, repo_url, demo_url, tech_stack, status, featured, sort_order, published_at) VALUES
   ('a3333333-3333-4333-8333-333333333333', 'url-shortener-rust', 'URL Shortener in Rust', 'A blazing-fast URL shortener written in Rust with SQLite storage.', '## Overview
 
@@ -70,7 +70,7 @@ A minimal URL shortener built in Rust, focusing on performance and simplicity. U
 
 ## Benchmarks
 
-Handles **100k+ requests/sec** on a single core.', 'https://github.com/walfa/url-shortener-rust', 'https://s.walfa.dev', '["Rust","Axum","SQLite"]', 'published', 1, 2, CURRENT_TIMESTAMP);
+Handles **100k+ requests/sec** on a single core.', 'https://github.com/walfa/url-shortener-rust', 'https://s.walfa.dev', '["Rust","Axum","SQLite"]', 'published', TRUE, 2, CURRENT_TIMESTAMP);
 INSERT INTO projects (project_id, slug, title, tagline, description_markdown, repo_url, demo_url, tech_stack, status, featured, sort_order, published_at) VALUES
   ('a4444444-4444-4444-8444-444444444444', 'cli-task-manager', 'CLI Task Manager', 'A terminal-based task manager written in Go with bubble tea TUI.', '## Overview
 
@@ -81,7 +81,7 @@ A keyboard-driven task manager for the terminal, built with Bubble Tea TUI frame
 - Kanban board view
 - Vim-style keybindings
 - Local SQLite storage
-- Export to JSON/Markdown', 'https://github.com/walfa/cli-task-manager', '', '["Go","Bubble Tea","SQLite"]', 'published', 0, 3, CURRENT_TIMESTAMP);
+- Export to JSON/Markdown', 'https://github.com/walfa/cli-task-manager', '', '["Go","Bubble Tea","SQLite"]', 'published', FALSE, 3, CURRENT_TIMESTAMP);
 INSERT INTO projects (project_id, slug, title, tagline, description_markdown, repo_url, demo_url, tech_stack, status, featured, sort_order, published_at) VALUES
   ('a5555555-5555-4555-8555-555555555555', 'graphql-mesh-gateway', 'GraphQL Mesh Gateway', 'A unified GraphQL gateway aggregating multiple REST APIs.', '## Overview
 
@@ -92,7 +92,7 @@ A GraphQL gateway that aggregates data from multiple REST APIs into a single uni
 - Schema stitching
 - Automatic REST to GraphQL mapping
 - Query batching and caching
-- Rate limiting per client', 'https://github.com/walfa/graphql-mesh-gateway', '', '["Go","GraphQL","gqlgen","Redis"]', 'published', 0, 4, CURRENT_TIMESTAMP);
+- Rate limiting per client', 'https://github.com/walfa/graphql-mesh-gateway', '', '["Go","GraphQL","gqlgen","Redis"]', 'published', FALSE, 4, CURRENT_TIMESTAMP);
 
 -- Project links
 INSERT INTO project_links (project_link_id, project_id, label, url, kind) VALUES
@@ -296,3 +296,7 @@ When I am not coding, you can find me contributing to open source, writing about
   twitter_url = 'https://twitter.com/walfa',
   updated_at = CURRENT_TIMESTAMP
 WHERE profile_id = 1;
+
+-- Admin user (admin / admin123)
+INSERT INTO admin_users (admin_user_id, username, password_hash) VALUES
+  ('00000000-0000-0000-0000-000000000001', 'admin', '$2a$10$Qwz/cxG0s36.a/3nwRf7kuvYI9/V.5ab0Y8C6LNE723211RNOsbdO');

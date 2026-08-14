@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/walfa-labs/backend/internal/domain"
@@ -262,6 +263,9 @@ func (r *PostRepo) Create(ctx context.Context, p *domain.BlogPost) error {
 		string(p.Status), p.ViewCount, p.PublishedAt,
 	)
 	if err != nil {
+		if isUniqueViolation(err) {
+			return domain.ErrConflict
+		}
 		return err
 	}
 
@@ -296,6 +300,9 @@ func (r *PostRepo) Update(ctx context.Context, p *domain.BlogPost) error {
 		string(p.Status), p.ViewCount, p.PublishedAt, p.ID.String(),
 	)
 	if err != nil {
+		if isUniqueViolation(err) {
+			return domain.ErrConflict
+		}
 		return err
 	}
 	if affected, err := res.RowsAffected(); err == nil && affected == 0 {
@@ -365,9 +372,65 @@ func (r *PostRepo) syncPostTags(ctx context.Context, tx *sql.Tx, postID uuid.UUI
 	if _, err := tx.ExecContext(ctx, `DELETE FROM post_tags WHERE blog_post_id = :1`, postID.String()); err != nil {
 		return err
 	}
+	seen := make(map[string]bool)
 	for _, t := range tags {
-		_, err := tx.ExecContext(ctx,
-			`INSERT INTO post_tags (blog_post_id, tag_id) VALUES (:1, :2)`, postID.String(), t.ID.String())
+		slug := strings.TrimSpace(t.Slug)
+		name := strings.TrimSpace(t.Name)
+		if slug == "" && name == "" {
+			continue
+		}
+		if slug == "" {
+			slug = strings.ToLower(strings.ReplaceAll(name, " ", "-"))
+		}
+		if name == "" {
+			name = slug
+		}
+		dedupKey := strings.ToLower(slug)
+		if seen[dedupKey] {
+			continue
+		}
+		seen[dedupKey] = true
+
+		var tagID string
+		// 1. Try to find existing tag by slug or name (case-insensitive)
+		err := tx.QueryRowContext(ctx, `
+			SELECT tag_id FROM tags WHERE slug = :1 OR LOWER(name) = LOWER(:2) FETCH FIRST 1 ROWS ONLY`,
+			slug, name,
+		).Scan(&tagID)
+
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				newID := uuid.New().String()
+				_, err = tx.ExecContext(ctx, `
+					MERGE INTO tags t
+					USING (SELECT :1 AS name, :2 AS slug FROM dual) s
+					ON (t.slug = s.slug)
+					WHEN MATCHED THEN UPDATE SET t.name = s.name
+					WHEN NOT MATCHED THEN INSERT (tag_id, name, slug) VALUES (:3, s.name, s.slug)`,
+					name, slug, newID,
+				)
+				if err != nil {
+					err = tx.QueryRowContext(ctx, `SELECT tag_id FROM tags WHERE slug = :1 OR LOWER(name) = LOWER(:2) FETCH FIRST 1 ROWS ONLY`, slug, name).Scan(&tagID)
+					if err != nil {
+						return err
+					}
+				} else {
+					if err := tx.QueryRowContext(ctx, `SELECT tag_id FROM tags WHERE slug = :1`, slug).Scan(&tagID); err != nil {
+						return err
+					}
+				}
+			} else {
+				return err
+			}
+		}
+
+		_, err = tx.ExecContext(ctx, `
+			MERGE INTO post_tags pt
+			USING (SELECT :1 AS blog_post_id, :2 AS tag_id FROM dual) s
+			ON (pt.blog_post_id = s.blog_post_id AND pt.tag_id = s.tag_id)
+			WHEN NOT MATCHED THEN INSERT (blog_post_id, tag_id) VALUES (s.blog_post_id, s.tag_id)`,
+			postID.String(), tagID,
+		)
 		if err != nil {
 			return err
 		}

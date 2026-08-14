@@ -168,6 +168,15 @@ func (r *AdminRepo) GetByUsername(ctx context.Context, username string) (*domain
 	return nil, domain.ErrNotFound
 }
 
+// Upsert saves or replaces the in-memory admin user.
+func (r *AdminRepo) Upsert(ctx context.Context, u *domain.AdminUser) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	cp := *u
+	r.user = &cp
+	return nil
+}
+
 // ExperienceRepo in-memory
 type ExperienceRepo struct {
 	mu   sync.RWMutex

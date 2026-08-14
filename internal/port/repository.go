@@ -83,6 +83,7 @@ type AssetRepo interface {
 // AdminRepo persists the admin user.
 type AdminRepo interface {
 	GetByUsername(ctx context.Context, username string) (*domain.AdminUser, error)
+	Upsert(ctx context.Context, u *domain.AdminUser) error
 }
 
 // ProfileRepo persists the singleton Profile aggregate.
