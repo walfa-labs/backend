@@ -29,7 +29,7 @@ func NewAssetStore(baseDir, baseURL string) (*AssetStore, error) {
 	}
 	baseURL = strings.TrimSuffix(baseURL, "/")
 
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
+	if err := os.MkdirAll(baseDir, 0750); err != nil {
 		return nil, fmt.Errorf("local asset store: create base dir: %w", err)
 	}
 
@@ -44,12 +44,26 @@ func (s *AssetStore) Upload(ctx context.Context, key string, r io.Reader, conten
 	cleanKey := filepath.Clean(filepath.FromSlash(key))
 	targetPath := filepath.Join(s.baseDir, cleanKey)
 
+	// Guard against directory traversal: resolved path must remain under baseDir.
+	absBase, err := filepath.Abs(s.baseDir)
+	if err != nil {
+		return "", fmt.Errorf("local asset store: resolve base dir: %w", err)
+	}
+	absTarget, err := filepath.Abs(targetPath)
+	if err != nil {
+		return "", fmt.Errorf("local asset store: resolve target path: %w", err)
+	}
+	if !strings.HasPrefix(absTarget, absBase+string(filepath.Separator)) {
+		return "", fmt.Errorf("local asset store: key %q escapes storage root", key)
+	}
+
 	// Ensure subdirectories exist
-	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(absTarget), 0750); err != nil {
 		return "", fmt.Errorf("local asset store: create dirs for %q: %w", key, err)
 	}
 
-	out, err := os.Create(targetPath)
+	// #nosec G304 -- path is validated above to be within the storage root
+	out, err := os.Create(absTarget)
 	if err != nil {
 		return "", fmt.Errorf("local asset store: create file %q: %w", key, err)
 	}
