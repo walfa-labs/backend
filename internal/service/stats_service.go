@@ -14,6 +14,7 @@ type StatsService struct {
 	analytics port.AnalyticsStore
 }
 
+// NewStatsService constructs a StatsService over the operational repo and analytics store.
 func NewStatsService(repo port.StatsRepo, analytics port.AnalyticsStore) *StatsService {
 	return &StatsService{repo: repo, analytics: analytics}
 }
@@ -34,6 +35,7 @@ func (s *StatsService) Summary(ctx context.Context) (port.StatsSummary, error) {
 	return summary, nil
 }
 
+// ViewsTimeSeries returns cumulative view counts per bucket over [from, to].
 func (s *StatsService) ViewsTimeSeries(ctx context.Context, from, to time.Time, bucket string) ([]port.ViewsBucket, error) {
 	if from.IsZero() {
 		from = time.Now().AddDate(0, -1, 0) // default: 1 month back
@@ -47,6 +49,7 @@ func (s *StatsService) ViewsTimeSeries(ctx context.Context, from, to time.Time, 
 	return s.analytics.ViewsTimeSeries(ctx, from, to, bucket)
 }
 
+// TopPosts returns the most-viewed posts, capped at the given limit.
 func (s *StatsService) TopPosts(ctx context.Context, limit int) ([]port.TopPost, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 10
