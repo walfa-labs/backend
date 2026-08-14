@@ -238,6 +238,7 @@ type PostResponse struct {
 	PostSummaryResponse
 	BodyMarkdown string `json:"bodyMarkdown"`
 	ViewCount    int    `json:"viewCount"`
+	Status       string `json:"status"`
 }
 
 type TagResponse struct {
@@ -277,6 +278,7 @@ func toPostResponse(p *domain.BlogPost) PostResponse {
 		},
 		BodyMarkdown: p.BodyMarkdown,
 		ViewCount:    p.ViewCount,
+		Status:       string(p.Status),
 	}
 	if p.PublishedAt != nil {
 		t := p.PublishedAt.Format(time.RFC3339)
