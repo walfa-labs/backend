@@ -12,6 +12,7 @@ import (
 
 	"github.com/walfa-labs/backend/internal/adapter/handler"
 	"github.com/walfa-labs/backend/internal/adapter/middleware"
+	"github.com/walfa-labs/backend/internal/adapter/repository/localstorage"
 	"github.com/walfa-labs/backend/internal/adapter/repository/memory"
 	"github.com/walfa-labs/backend/internal/adapter/repository/oracle/adw"
 	"github.com/walfa-labs/backend/internal/adapter/repository/oracle/atp"
@@ -95,19 +96,28 @@ func main() {
 
 		analyticsStore = adw.NewAnalyticsStore(adwDB)
 
-		store, err := objectstorage.NewAssetStore(
-			cfg.OCI.TenancyOCID,
-			cfg.OCI.UserOCID,
-			cfg.OCI.Fingerprint,
-			cfg.OCI.Region,
-			cfg.OCI.PrivateKeyPath,
-			cfg.OCI.Namespace,
-			cfg.OCI.Bucket,
-		)
-		if err != nil {
-			logger.Fatalf("failed to create asset store: %v", err)
+		if cfg.StorageDriver == "local" {
+			localStore, err := localstorage.NewAssetStore(cfg.LocalStorageDir, cfg.LocalStorageBaseURL)
+			if err != nil {
+				logger.Fatalf("failed to create local asset store: %v", err)
+			}
+			assetStore = localStore
+		} else {
+			store, err := objectstorage.NewAssetStore(
+				cfg.OCI.TenancyOCID,
+				cfg.OCI.UserOCID,
+				cfg.OCI.Fingerprint,
+				cfg.OCI.Region,
+				cfg.OCI.PrivateKeyPath,
+				cfg.OCI.Namespace,
+				cfg.OCI.Bucket,
+			)
+			if err != nil {
+				logger.Fatalf("failed to create asset store: %v", err)
+			}
+			assetStore = store
 		}
-		assetStore = store
+
 		healthH = handler.NewHealthHandler(atpDB, adwDB)
 	}
 

@@ -37,6 +37,14 @@ func Register(app *fiber.App, deps Deps) {
 	app.Use(middleware.Recover(deps.Logger))
 	app.Use(middleware.CORS(deps.Cfg))
 
+	// --- Static assets for local storage mode ---
+	if deps.Cfg.StorageDriver == "local" {
+		app.Get("/uploads/*", func(c fiber.Ctx) error {
+			filePath := deps.Cfg.LocalStorageDir + "/" + c.Params("*")
+			return c.SendFile(filePath)
+		})
+	}
+
 	// --- Swagger UI (public, outside /api/v1) ---
 	// Serves the UI at /swagger and the spec at openapi.yaml
 	openapiPath := resolveOpenAPIPath()

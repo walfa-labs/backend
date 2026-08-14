@@ -1,160 +1,487 @@
-# Portfolio Backend
+# Portfolio Backend API
 
-Go (Fiber v3) backend API for a personal portfolio with dynamic content — experience, projects, and blog posts. Built with a clean/hexagonal architecture (Ports & Adapters), Sonic JSON, gookit/slog logging, and Oracle Cloud polyglot persistence: Autonomous Transaction Processing (ATP) for operational data, Autonomous Data Warehouse (ADW) for analytics, and OCI Object Storage for assets.
+[![Go Version](https://img.shields.io/badge/Go-1.26.6-00ADD8?style=flat&logo=go)](https://go.dev)
+[![Fiber Framework](https://img.shields.io/badge/Fiber-v3.4.0-00ACD7?style=flat&logo=go)](https://gofiber.io)
+[![Database](https://img.shields.io/badge/Oracle-ATP%20%2B%20ADW%20%2B%2023ai-F80000?style=flat&logo=oracle)](https://www.oracle.com/cloud/database/)
+[![Security](https://img.shields.io/badge/DevSecOps-SAST%20%7C%20DAST%20%7C%20SCA-brightgreen?style=flat&logo=securityscorecard)](https://github.com/walfa-labs/backend/actions)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+A high-performance, enterprise-grade REST API backend for developer portfolios and dynamic content management. Built in Go with the **Fiber v3** framework (fasthttp core), **Sonic JSON** SIMD/JIT parsing, and a clean **Hexagonal Architecture** (Ports & Adapters).
+
+Persistence is designed for **polyglot Oracle Cloud** environments (OCI Always Free tier) while providing seamless offline local development with **Oracle Free 23ai in Docker** and **local disk storage**.
+
+---
+
+## Table of Contents
+
+- [Overview & Highlights](#overview--highlights)
+- [Architecture & Design](#architecture--design)
+- [Tech Stack](#tech-stack)
+- [Project Directory Structure](#project-directory-structure)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Option A: Local Development with Docker (Recommended)](#option-a-local-development-with-docker-recommended)
+  - [Option B: Oracle Cloud Infrastructure (OCI Production)](#option-b-oracle-cloud-infrastructure-oci-production)
+  - [Option C: Zero-Infra Mock / DAST Mode](#option-c-zero-infra-mock--dast-mode)
+- [API Reference & Endpoints](#api-reference--endpoints)
+  - [Public Endpoints](#public-endpoints-read-only-cached)
+  - [Authentication Endpoints](#authentication-endpoints)
+  - [Admin Management Endpoints](#admin-management-endpoints-jwt-required)
+  - [Analytics & Stats Endpoints](#analytics--stats-endpoints)
+  - [System & Documentation](#system--documentation)
+- [Security & DevSecOps](#security--devsecops)
+- [Configuration Reference](#configuration-reference)
+- [Taskfile Commands (CLI Reference)](#taskfile-commands-cli-reference)
+- [Testing & Quality Assurance](#testing--quality-assurance)
+
+---
+
+## Overview & Highlights
+
+- **Blazing Fast Throughput**: Built on top of Fiber v3 (fasthttp) and ByteDance Sonic JIT/SIMD JSON encoder/decoder.
+- **Hexagonal Architecture (Ports & Adapters)**: Clear domain boundaries, dependency inversion, and swappable infrastructure adapters.
+- **Polyglot Oracle Persistence**:
+  - **OLTP**: Autonomous Transaction Processing (ATP) or Oracle Database 23ai Free for core operational domain models (experiences, projects, blog posts, tags, assets, singleton profile, admin auth).
+  - **OLAP / Analytics**: Autonomous Data Warehouse (ADW) or Oracle Database 23ai Free for star-schema analytics (`dim_posts`, `fact_post_views`), powering real-time time-series views and engagement ranking.
+  - **Dual Asset Storage**: Cloud-native OCI Object Storage with Pre-Authenticated Request (PAR) generation, or Local File System storage with static HTTP routing.
+- **Dual-Write View Tracking**: Non-blocking asynchronous dual-write pattern on public post reads (ATP view counter + ADW analytics fact records).
+- **Hardened Security**:
+  - JWT authentication (HS256) with short-lived access tokens (15m) and sliding refresh tokens (7d) via `httpOnly`, `Secure`, `SameSite=Strict` cookies.
+  - Rate-limited auth endpoints (5 requests/minute per client IP).
+  - Centralized security headers middleware (HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy).
+  - Full DevSecOps pipeline: Gitleaks, TruffleHog, Gosec SAST, Semgrep, Govulncheck SCA, Trivy (FS + Container), Zizmor workflow auditing, CodeQL, and OWASP ZAP DAST.
+- **Developer Experience**:
+  - Live OpenAPI 3 specification and interactive Swagger UI at `/swagger`.
+  - Structured logging with `gookit/slog` and automatic log file rotation.
+  - Standardized JSON success envelopes and RFC-style error envelopes with request correlation ID tracking (`X-Request-ID`).
+  - In-Memory Mock repository implementation for instant, dependency-free testing.
+
+---
+
+## Architecture & Design
+
+The application follows the **Hexagonal / Clean Architecture** (Ports & Adapters) paradigm. Dependency flow points inward: `adapter` &rarr; `service` &rarr; `port` &rarr; `domain`. The `domain` package has zero internal or external framework dependencies.
+
+```
+                  +-------------------------------------------------------+
+                  |                     HTTP CLIENTS                      |
+                  +-------------------------------------------------------+
+                                              |
+                                              v
+                  +-------------------------------------------------------+
+                  |             Driving Adapter (Fiber v3)                |
+                  |   - Router, Middleware (Auth, CORS, Security, Log)    |
+                  |   - Request DTOs, Input Validation, Envelopes         |
+                  +-------------------------------------------------------+
+                                              |
+                                              v
+                  +-------------------------------------------------------+
+                  |               Application Services                    |
+                  |   - Experience, Project, Post, Auth, Asset, Profile   |
+                  |   - Business rules, State transitions, Dual-write     |
+                  +-------------------------------------------------------+
+                                              |
+                                              v
+                  +-------------------------------------------------------+
+                  |                     Port Layer                        |
+                  |   - Interfaces: *Repo, AnalyticsStore, AssetStore     |
+                  +-------------------------------------------------------+
+                                              |
+                        +---------------------+---------------------+
+                        |                                           |
+                        v                                           v
++-----------------------------------------------+   +-------------------------------+
+|           Driven Adapters (Oracle / Local)     |   |         Domain Layer          |
+|  - ATP Repo (godror SQL - OLTP)               |   |  - Core Entities              |
+|  - ADW Analytics Store (godror SQL - OLAP)    |   |  - Sentinel Errors            |
+|  - OCI Object Storage / Local Storage Store   |   |  - Domain Enums               |
+|  - In-Memory Mock Store (for tests & DAST)    |   |  (Zero dependencies)          |
++-----------------------------------------------+   +-------------------------------+
+```
+
+---
 
 ## Tech Stack
 
-| Concern | Library |
-|---|---|
-| HTTP framework | [Fiber v3](https://github.com/gofiber/fiber) |
-| JSON | [Sonic](https://github.com/bytedance/sonic) (JIT + SIMD) |
-| Logging | [gookit/slog](https://github.com/gookit/slog) (rotating files + colored console) |
-| Validation | [go-playground/validator](https://github.com/go-playground/validator) |
-| Database (OLTP) | Oracle ATP via [godror](https://github.com/godror/godror) (database/sql) |
-| Database (analytics) | Oracle ADW via [godror](https://github.com/godror/godror) (database/sql) |
-| Migrations | [golang-migrate](https://github.com/golang-migrate/migrate) (oracle driver) |
-| Auth | [golang-jwt/v5](https://github.com/golang-jwt/jwt) |
-| Object storage | [oci-go-sdk](https://github.com/oracle/oci-go-sdk) (OCI Object Storage) |
-| Config | [caarlos0/env](https://github.com/caarlos0/env) |
-| API docs | [contrib/swaggerui](https://github.com/gofiber/contrib) (Swagger UI + OpenAPI 3) |
+| Component | Technology / Library | Description |
+|---|---|---|
+| **Language** | Go `1.26.6` | High-concurrency compiled backend language |
+| **HTTP Engine** | [Fiber v3](https://github.com/gofiber/fiber/v3) (`v3.4.0`) | Express-inspired fasthttp web framework |
+| **JSON Codec** | [Sonic](https://github.com/bytedance/sonic) | SIMD/JIT accelerated JSON serializer/deserializer |
+| **Database Driver** | [godror](https://github.com/godror/godror) | Native Oracle Database driver via ODPI-C |
+| **Persistence (OLTP)** | Oracle ATP / Oracle 23ai Free | Operational transactional data store |
+| **Persistence (OLAP)** | Oracle ADW / Oracle 23ai Free | Analytics and star-schema time-series warehouse |
+| **Migrations** | [golang-migrate](https://github.com/golang-migrate/migrate) | Database schema migrations with Oracle driver |
+| **Authentication** | [golang-jwt/jwt/v5](https://github.com/golang-jwt/jwt) + [bcrypt](https://pkg.go.dev/golang.org/x/crypto/bcrypt) | JWT token signing, verification & password hashing |
+| **Asset Storage** | [OCI Go SDK](https://github.com/oracle/oci-go-sdk) / Local Disk | Oracle Cloud Object Storage (PAR) & Local filesystem |
+| **Validation** | [go-playground/validator/v10](https://github.com/go-playground/validator/v10) | Struct validation mapped via Fiber validator |
+| **Logging** | [gookit/slog](https://github.com/gookit/slog) + [rotatefile](https://github.com/gookit/rotatefile) | Structured console and rotating file logger |
+| **API Documentation** | [Swagger UI](https://github.com/gofiber/contrib/v3/swaggerui) | Interactive OpenAPI 3 explorer at `/swagger` |
+| **Task Runner** | [Task](https://taskfile.dev) | Modern task execution engine (`Taskfile.yml`) |
 
-## Architecture
+---
+
+## Project Directory Structure
 
 ```
-cmd/api/main.go          → entrypoint: wire DI, start server
-internal/
-  config/                → env loading
-  domain/                → core entities + errors (no deps)
-  port/                  → interfaces (repository + service contracts)
-  service/               → use-case / application layer
-  adapter/
-    handler/             → HTTP handlers (Fiber driving adapter)
-    middleware/          → recover, logger, cors, auth, error, requestid
-    repository/oracle/
-      atp/               → ATP (OLTP) repositories (driven adapter)
-      adw/               → ADW analytics store (driven adapter)
-      objectstorage/     → OCI Object Storage asset store (driven adapter)
-  router/                → route registration
-  platform/              → server factory, logger, db pool, json, validator
-migrations/
-  atp/                   → golang-migrate sequence for the ATP database
-  adw/                   → golang-migrate sequence for the ADW database
-  seed.sql               → demo data for ATP (applied manually)
+├── .github/
+│   └── workflows/              # CI/CD, DevSecOps, DAST, and Release pipelines
+│       ├── ci.yml              # Linting, unit/integration testing, build & Trivy scan
+│       ├── dast.yml            # OWASP ZAP dynamic security scan against live API
+│       ├── release.yml         # Multi-arch container build, SBOM & GitHub Release
+│       └── security.yml       # Gitleaks, TruffleHog, Gosec, Semgrep, Govulncheck, Zizmor, CodeQL
+├── cmd/
+│   └── api/
+│       └── main.go             # Application entrypoint: DI wiring, shutdown lifecycle
+├── docker/
+│   └── init-oracle.sql         # Local Oracle 23ai database initialization script
+├── docs/
+│   └── openapi.yaml            # OpenAPI 3.0 API specification
+├── internal/
+│   ├── adapter/
+│   │   ├── handler/            # HTTP driving adapters (Fiber handlers, DTO mapping)
+│   │   ├── middleware/         # Auth, CORS, Logger, Recover, RequestID, SecurityHeaders
+│   │   └── repository/         # Driven persistence adapters
+│   │       ├── localstorage/   # Local disk asset storage implementation
+│   │       ├── memory/         # In-memory repository & mock store (tests & DAST)
+│   │       └── oracle/
+│   │           ├── adw/        # Oracle ADW analytics implementation (star schema)
+│   │           ├── atp/        # Oracle ATP OLTP repository implementation
+│   │           └── objectstorage/# OCI Object Storage adapter (PAR generation)
+│   ├── config/                 # Environment configuration loader (caarlos0/env)
+│   ├── domain/                 # Core entities, enums, and sentinel errors
+│   ├── platform/               # Infrastructure factories (Fiber server, Oracle DB pool, logger)
+│   ├── port/                   # Core repository and service interface contracts
+│   ├── router/                 # Route registration and endpoint group definitions
+│   └── service/                # Business logic and use-case implementation
+├── migrations/
+│   ├── adw/                    # golang-migrate SQL files for analytics database
+│   ├── atp/                    # golang-migrate SQL files for operational database
+│   ├── seed.sql                # ATP seed dataset for demo/development
+│   └── seed_ora.sql            # Oracle SQLcl-compatible seed script
+├── .air.toml                   # Hot reload configuration for Air
+├── .gitleaks.toml              # Gitleaks secret scanning rules and allowlists
+├── .golangci.yml               # Linter configuration for golangci-lint
+├── docker-compose.yml          # Local container stack (Oracle Free 23ai, Backend, ZAP DAST)
+├── Dockerfile                  # Multi-stage container build (Oracle Linux 9 + Instant Client)
+├── go.mod                      # Go module definition (Go 1.26.6)
+└── Taskfile.yml                # Taskfile automation runner
 ```
 
-## Quick Start
+---
 
-Prerequisites: Go 1.26+, [Task](https://taskfile.dev), and **already-running Oracle Cloud infrastructure** — this project does not deploy anything itself. You need (all available in the OCI Always Free tier):
+## Getting Started
 
-- an **Autonomous Transaction Processing** database and an **Autonomous Data Warehouse** database, with their wallet zip(s) downloaded and unzipped (point `TNS_ADMIN` at the wallet directory),
-- an **OCI Object Storage** bucket that already exists, plus an OCI API key pair (unencrypted PEM) for a user with access to it,
-- **Oracle Instant Client** installed (godror needs it at runtime; builds work without it),
-- a **C compiler for CGO** (`gcc`/`clang`; `zig cc` works) — godror requires `CGO_ENABLED=1`,
-- **SQLcl** (`sql`) and the **golang-migrate** CLI for the DB tasks (`task tools` installs the latter, built with the `oracle` tag).
+### Prerequisites
 
-All connection details live in `.env`:
+- **Go**: `1.26.6` or later installed
+- **CGO Toolchain**: C compiler required for godror / ODPI-C compilation (`gcc`, `clang`, or `zig cc`)
+- **Task Runner**: [Taskfile](https://taskfile.dev/installation/) (`task`)
+- **Docker & Docker Compose**: (Required for local Oracle container development)
+- **Oracle Instant Client**: (Runtime requirement for local bare-metal execution; built-in for Docker)
 
+---
+
+### Option A: Local Development with Docker (Recommended)
+
+This mode runs **Oracle Database 23ai Free** in Docker and stores asset uploads on your local disk.
+
+#### 1. Setup Environment Configuration
 ```bash
-# Copy the env template, then edit it to point at your infra:
-# ATP_DSN, ADW_DSN, TNS_ADMIN, MIGRATE_ATP_URL/MIGRATE_ADW_URL,
-# OCI_TENANCY_OCID/USER_OCID/FINGERPRINT/REGION/PRIVATE_KEY_PATH/BUCKET,
-# JWT_SECRET, ADMIN_PASSWORD_HASH, ... (see .env.example for everything)
 cp .env.example .env
+```
 
-# Install dev tools used below (air + golang-migrate CLI)
+Ensure your `.env` contains the default local settings:
+```env
+APP_ENV=development
+APP_PORT=:8080
+STORAGE_DRIVER=local
+STORAGE_LOCAL_DIR=./uploads
+STORAGE_BASE_URL=http://localhost:8080/uploads
+ATP_DSN=portfolio_atp/devpassword@localhost:1521/FREEPDB1
+ADW_DSN=portfolio_adw/devpassword@localhost:1521/FREEPDB1
+MIGRATE_ATP_URL=oracle://portfolio_atp:devpassword@localhost:1521/FREEPDB1
+MIGRATE_ADW_URL=oracle://portfolio_adw:devpassword@localhost:1521/FREEPDB1
+JWT_SECRET=dev-secret-change-me
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD_HASH='$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy'
+```
+
+#### 2. Start the Oracle Database Container
+```bash
+# Start Oracle 23ai Free container
+task docker:compose-up
+```
+*Note: Wait ~20–30 seconds on initial startup until the container healthcheck marks healthy.*
+
+#### 3. Install CLI Tooling & Apply Migrations
+```bash
+# Install development and migration tools (Air, golang-migrate with Oracle support)
 task tools
 
-# Apply database migrations to ATP and ADW, then optionally load demo data
+# Apply migrations to ATP and ADW schemas
 task migrate-up
+
+# (Optional) Seed initial demo data
 task seed
+```
 
-# Create an admin user — login reads the admin_users table, not
-# ADMIN_PASSWORD_HASH; generate your own bcrypt hash for anything real.
-sql "$ATP_DSN" <<< \
-  "INSERT INTO admin_users (admin_user_id, username, password_hash) VALUES ('<uuid>', 'admin', '<bcrypt-hash>');"
+#### 4. Run the API Server
+```bash
+# Option 1: Run with hot-reload via Air
+task dev
 
-# Start the server on :8080 (Task loads .env automatically)
+# Option 2: Standard Go run
 task run
 ```
 
-Without Task, the equivalent is to export the variables yourself:
-`set -a; . ./.env; set +a && go run ./cmd/api`
+Access Swagger UI documentation at: **[http://localhost:8080/swagger](http://localhost:8080/swagger)**
 
-Note: there is intentionally no `docker-compose.yml` anymore — the datastores are managed Oracle Cloud services, so there is nothing to run locally in containers.
+---
 
-## API Endpoints
+### Option B: Oracle Cloud Infrastructure (OCI Production)
 
-Interactive docs: **Swagger UI at `/swagger`** (public, no auth). The OpenAPI 3 spec
-lives at `docs/openapi.yaml` and is served at `/docs/openapi.yaml` — it is read from
-disk at startup, so run the binary from the repo root.
+For deployment against live Oracle Cloud Autonomous Databases and OCI Object Storage:
 
-### Public (read-only, cached)
-```
-GET /api/v1/experiences
-GET /api/v1/experiences/:id
-GET /api/v1/projects
-GET /api/v1/projects/:slug
-GET /api/v1/blog/posts
-GET /api/v1/blog/posts/:slug
-GET /api/v1/tags
-GET /api/v1/stats/summary
-GET /api/v1/assets/*            → redirect to signed URL (key may contain slashes, e.g. images/<uuid>.png)
-GET /api/v1/health
-```
+1. **Obtain OCI Credentials & Wallet**:
+   - Download ATP & ADW client credentials wallet `.zip` files and extract them to `./wallet`.
+   - Create an OCI Object Storage bucket (e.g., `portfolio-assets`).
+   - Generate an OCI API Signing Key pair (`oci_api_key.pem`).
+2. **Configure `.env`**:
+   ```env
+   APP_ENV=production
+   APP_PORT=:8080
+   TNS_ADMIN=./wallet
+   ATP_DSN=portfolio/your_password@portfolio_atp_high
+   ADW_DSN=portfolio/your_password@portfolio_adw_high
+   STORAGE_DRIVER=oci
+   OCI_TENANCY_OCID=ocid1.tenancy.oc1..your_tenancy
+   OCI_USER_OCID=ocid1.user.oc1..your_user
+   OCI_FINGERPRINT=aa:bb:cc:...
+   OCI_REGION=ap-singapore-1
+   OCI_PRIVATE_KEY_PATH=./oci_api_key.pem
+   OCI_BUCKET=portfolio-assets
+   ```
+3. **Migrate & Start**:
+   ```bash
+   task migrate-up
+   task run
+   ```
 
-### Auth
-```
-POST /api/v1/auth/login           → { accessToken, refreshToken }
-POST /api/v1/auth/refresh
-```
+---
 
-### Admin (JWT required)
-```
-POST   /api/v1/admin/experiences
-GET    /api/v1/admin/experiences
-GET    /api/v1/admin/experiences/:id
-PUT    /api/v1/admin/experiences/:id
-PATCH  /api/v1/admin/experiences/:id
-DELETE /api/v1/admin/experiences/:id
+### Option C: Zero-Infra Mock / DAST Mode
 
-POST   /api/v1/admin/projects
-GET    /api/v1/admin/projects
-GET    /api/v1/admin/projects/:id
-PUT    /api/v1/admin/projects/:id
-PATCH  /api/v1/admin/projects/:id
-DELETE /api/v1/admin/projects/:id
-
-POST   /api/v1/admin/blog/posts
-GET    /api/v1/admin/blog/posts
-GET    /api/v1/admin/blog/posts/:id
-PUT    /api/v1/admin/blog/posts/:id
-PATCH  /api/v1/admin/blog/posts/:id
-DELETE /api/v1/admin/blog/posts/:id
-PATCH  /api/v1/admin/blog/posts/:id/status    → { status: "published"|"draft" }
-
-POST   /api/v1/admin/assets                     → multipart upload
-DELETE /api/v1/admin/assets/*                   → key may contain slashes
-
-GET    /api/v1/admin/stats/views?from=&to=&bucket=
-GET    /api/v1/admin/stats/top-posts?limit=
-```
-
-## Configuration
-
-See `.env.example` for all environment variables.
-
-## Development
-
-Everything goes through the Taskfile (`task --list` to see all tasks):
+Run the entire application in-memory with zero external database or storage dependencies:
 
 ```bash
-task run          # start the server (loads .env)
-task dev          # hot reload via air
-task build        # build the binary to bin/
-task test         # go test ./...
-task vet          # go vet ./...
-task tidy         # go mod tidy
-task migrate-up   # apply migrations to ATP + ADW (MIGRATE_*_URL from .env)
-task migrate-down # roll back migrations
-task seed         # load demo data into ATP
+APP_ENV=mock ATP_DSN=mock ADW_DSN=mock JWT_SECRET=mock-secret ADMIN_PASSWORD_HASH='$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy' go run ./cmd/api
 ```
+
+---
+
+## API Reference & Endpoints
+
+Interactive documentation with request/response schemas is available via Swagger UI at `/swagger`.
+
+### Public Endpoints (Read-Only, Cached)
+
+| Method | Endpoint | Description | Cache / Behavior |
+|---|---|---|---|
+| `GET` | `/api/v1/health` | Service healthcheck (pings ATP & ADW) | `no-store` |
+| `GET` | `/api/v1/experiences` | List professional work experiences | `public, max-age=300` |
+| `GET` | `/api/v1/experiences/:id` | Get specific experience details | `public, max-age=300` |
+| `GET` | `/api/v1/projects` | List published projects (supports `?featured=true`) | `public, max-age=300` |
+| `GET` | `/api/v1/projects/:slug` | Get project by URL slug | `public, max-age=300` |
+| `GET` | `/api/v1/blog/posts` | List published blog posts (paginated, `?tag=`) | `public, max-age=180` |
+| `GET` | `/api/v1/blog/posts/:slug` | Get post by slug (increments views in ATP & ADW) | `public, max-age=180` |
+| `GET` | `/api/v1/tags` | List all unique blog post tags with post counts | `public, max-age=600` |
+| `GET` | `/api/v1/stats/summary` | Portfolio summary statistics | `public, max-age=300` |
+| `GET` | `/api/v1/profile` | Public singleton portfolio profile | `public, max-age=600` |
+| `GET` | `/api/v1/assets/*` | Resolve asset key & redirect (302) to signed PAR URL | `302 Found` |
+| `GET` | `/uploads/*` | Static file serving (only active when `STORAGE_DRIVER=local`) | Direct File |
+
+### Authentication Endpoints
+
+| Method | Endpoint | Description | Auth / Rate Limit |
+|---|---|---|---|
+| `POST` | `/api/v1/auth/login` | Authenticate admin; returns JWT & sets refresh cookie | 5 req/min per IP |
+| `POST` | `/api/v1/auth/refresh` | Refresh expired access token using refresh token | Token required |
+
+### Admin Management Endpoints (JWT Required)
+
+All admin routes require a valid Bearer token (`Authorization: Bearer <token>`).
+
+| Resource | Method | Endpoint | Description |
+|---|---|---|---|
+| **Experiences** | `GET` | `/api/v1/admin/experiences` | List all experiences |
+| | `GET` | `/api/v1/admin/experiences/:id` | Get experience by ID |
+| | `POST` | `/api/v1/admin/experiences` | Create new experience |
+| | `PUT/PATCH` | `/api/v1/admin/experiences/:id` | Update experience |
+| | `DELETE` | `/api/v1/admin/experiences/:id` | Delete experience |
+| **Projects** | `GET` | `/api/v1/admin/projects` | List all projects (including drafts) |
+| | `GET` | `/api/v1/admin/projects/:id` | Get project by ID |
+| | `POST` | `/api/v1/admin/projects` | Create new project |
+| | `PUT/PATCH` | `/api/v1/admin/projects/:id` | Update project |
+| | `DELETE` | `/api/v1/admin/projects/:id` | Delete project |
+| **Blog Posts** | `GET` | `/api/v1/admin/blog/posts` | List all posts (drafts, archived, published) |
+| | `GET` | `/api/v1/admin/blog/posts/:id` | Get blog post by ID |
+| | `POST` | `/api/v1/admin/blog/posts` | Create new blog post |
+| | `PUT/PATCH` | `/api/v1/admin/blog/posts/:id` | Update blog post |
+| | `DELETE` | `/api/v1/admin/blog/posts/:id` | Delete blog post |
+| | `PATCH` | `/api/v1/admin/blog/posts/:id/status` | Transition post status (`draft`, `published`, `archived`) |
+| **Assets** | `POST` | `/api/v1/admin/assets` | Upload image asset (multipart, max 10MB) |
+| | `DELETE` | `/api/v1/admin/assets/*` | Delete asset by key |
+| **Profile** | `GET` | `/api/v1/admin/profile` | Get admin singleton profile details |
+| | `PUT` | `/api/v1/admin/profile` | Upsert singleton profile details |
+
+### Analytics & Stats Endpoints
+
+| Method | Endpoint | Description | Auth |
+|---|---|---|---|
+| `GET` | `/api/v1/admin/stats/views` | Time-series view analytics (`?from=&to=&bucket=day\|week\|month`) | Admin JWT |
+| `GET` | `/api/v1/admin/stats/top-posts` | Top performing blog posts ranking (`?limit=10`) | Admin JWT |
+
+### System & Documentation
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/swagger` | Interactive Swagger UI API Explorer |
+| `GET` | `/docs/openapi.yaml` | Raw OpenAPI 3.0 YAML specification |
+
+---
+
+## Security & DevSecOps
+
+This repository integrates enterprise-grade DevSecOps security controls natively in CI/CD pipelines and local task runners:
+
+```
++-----------------------------------------------------------------------------+
+|                          DevSecOps Scanning Matrix                          |
++-------------------+----------------------+----------------------------------+
+| Security Domain   | Tooling              | Execution Phase                  |
++-------------------+----------------------+----------------------------------+
+| Secret Detection  | Gitleaks, TruffleHog | Pre-commit & CI Pipeline         |
+| SAST (Go Code)    | Gosec, Semgrep       | CI Pipeline & Local Task         |
+| SAST (Deep)       | GitHub CodeQL        | Scheduled & CI Pipeline          |
+| SCA (Dependencies)| Govulncheck, Trivy   | CI Pipeline & Local Task         |
+| Workflow Audit    | Zizmor               | CI Security Scan                 |
+| Container Scan    | Trivy Container      | Docker Build Step                |
+| DAST (Dynamic)    | OWASP ZAP (OpenAPI)  | Pull Requests & Weekly Schedule  |
+| Supply Chain      | CycloneDX SBOM       | Tagged Releases to GHCR          |
++-------------------+----------------------+----------------------------------+
+```
+
+Run all static security scans locally with:
+```bash
+task scan:all
+```
+
+---
+
+## Configuration Reference
+
+All settings are read from environment variables via `internal/config`:
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `APP_ENV` | `string` | `development` | Runtime environment (`development`, `production`, `mock`, `dast`) |
+| `APP_PORT` | `string` | `:8080` | TCP port for HTTP server binding |
+| `ATP_DSN` | `string` | *(Required)* | godror connect string for OLTP ATP database (`user/pass@host:port/service`) |
+| `ADW_DSN` | `string` | *(Required)* | godror connect string for OLAP ADW database (`user/pass@host:port/service`) |
+| `JWT_SECRET` | `string` | *(Required)* | HMAC-SHA256 secret key for signing JWT tokens |
+| `JWT_ACCESS_TTL` | `duration` | `15m` | Lifetime duration for access tokens |
+| `JWT_REFRESH_TTL` | `duration` | `168h` | Lifetime duration for refresh tokens (7 days) |
+| `ADMIN_USERNAME` | `string` | `admin` | Default admin username |
+| `ADMIN_PASSWORD_HASH` | `string` | *(Required)* | Bcrypt password hash for admin login |
+| `STORAGE_DRIVER` | `string` | `local` | Asset backend: `local` (disk) or `oci` (Oracle Object Storage) |
+| `STORAGE_LOCAL_DIR` | `string` | `./uploads` | Local directory for storing asset uploads |
+| `STORAGE_BASE_URL` | `string` | `http://localhost:8080/uploads` | Base URL used for resolving local asset URLs |
+| `OCI_TENANCY_OCID` | `string` | `""` | OCI Tenancy OCID (required if `STORAGE_DRIVER=oci`) |
+| `OCI_USER_OCID` | `string` | `""` | OCI User OCID (required if `STORAGE_DRIVER=oci`) |
+| `OCI_FINGERPRINT` | `string` | `""` | OCI Public key fingerprint |
+| `OCI_REGION` | `string` | `""` | OCI Region identifier (e.g., `ap-singapore-1`) |
+| `OCI_PRIVATE_KEY_PATH` | `string` | `""` | Absolute or relative path to OCI private key PEM file |
+| `OCI_NAMESPACE` | `string` | `""` | OCI Object Storage namespace (auto-resolved if omitted) |
+| `OCI_BUCKET` | `string` | `""` | Target OCI Object Storage bucket name |
+| `CORS_ALLOWED_ORIGINS` | `[]string` | `http://localhost:3000` | Comma-separated allowlist of CORS origins |
+| `MIGRATE_ATP_URL` | `string` | - | Used by `task migrate-up` for ATP migrations |
+| `MIGRATE_ADW_URL` | `string` | - | Used by `task migrate-up` for ADW migrations |
+
+---
+
+## Taskfile Commands (CLI Reference)
+
+Run `task --list` to view all available commands:
+
+### Development & Build
+```bash
+task run              # Start API server locally (loads .env)
+task dev              # Run server with hot reload via Air
+task build            # Compile production binary into bin/
+task clean            # Remove build artifacts, coverage files, and temporary directories
+task tidy             # Sync and tidy go.mod and go.sum dependencies
+task fmt              # Format all Go source files
+task vet              # Run Go static analysis (go vet)
+task tools            # Install development and security tools
+```
+
+### Testing & Code Quality
+```bash
+task test             # Run all unit and integration tests
+task test:unit        # Run unit tests only
+task test:integration # Run HTTP route integration tests
+task test:coverage    # Run test suite with race detector and coverage profiling
+task test:html        # Generate an HTML code coverage report
+task lint             # Run golangci-lint
+task lint:fix         # Run golangci-lint and auto-fix supported issues
+```
+
+### Security Scans (DevSecOps)
+```bash
+task scan:all         # Run all local static security scans
+task scan:secrets     # Run Gitleaks secret detection
+task scan:sast        # Run Gosec SAST analyzer
+task scan:sca         # Run Govulncheck dependency vulnerability scanner
+task scan:zizmor      # Audit GitHub Actions workflows for vulnerabilities
+task scan:docker      # Scan container image with Trivy
+task scan:dast        # Run OWASP ZAP DAST container against live API
+```
+
+### Database & Docker
+```bash
+task migrate-up       # Apply all database migrations to ATP and ADW
+task migrate-down     # Roll back all database migrations
+task seed             # Load demo dataset into ATP via SQLcl
+task docker:build     # Build local Docker container image
+task docker:run       # Run local Docker container
+task docker:stop      # Stop and remove local Docker container
+task docker:compose-up   # Start local stack with Oracle 23ai Free
+task docker:compose-down # Stop local Docker compose stack
+```
+
+---
+
+## Testing & Quality Assurance
+
+The codebase features comprehensive test suites spanning domain, service, repository, middleware, handler, and HTTP integration layers.
+
+To run the entire test suite with race condition detection and coverage reporting:
+
+```bash
+task test:coverage
+```
+
+### Test Structure
+- **Domain Tests** (`internal/domain`): Validates domain validation rules, errors, and entity behaviors.
+- **Service Unit Tests** (`internal/service`): Tests business logic, state transitions, and dual-write operations against mock repository ports.
+- **Repository Tests** (`internal/adapter/repository/memory`): Verifies CRUD operations and querying in the memory adapter.
+- **Handler Tests** (`internal/adapter/handler`): Validates request parsing, JSON deserialization, input validation, and HTTP status codes.
+- **Middleware Tests** (`internal/adapter/middleware`): Tests JWT auth verification, error handler envelopes, CORS headers, and security headers.
+- **Integration Tests** (`internal/router`): End-to-end HTTP request and response tests using Fiber's `app.Test()` engine.
+
+---
+
+## License
+
+Distributed under the MIT License. See [LICENSE](LICENSE) for details.

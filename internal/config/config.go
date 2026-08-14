@@ -13,11 +13,12 @@ type Config struct {
 	AppPort string `env:"APP_PORT" envDefault:":8080"`
 
 	// ATPDSN is the godror connect string for Autonomous Transaction
-	// Processing (operational OLTP store), e.g. "user/password@dbname_high".
-	// The wallet location is read from the standard TNS_ADMIN env var by ODPI.
+	// Processing (operational OLTP store), e.g. "user/password@dbname_high"
+	// or "user/password@host:port/service_name" for local Oracle DB.
 	ATPDSN string `env:"ATP_DSN,required"`
 	// ADWDSN is the godror connect string for Autonomous Data Warehouse
-	// (analytics store), e.g. "user/password@dbname_high".
+	// (analytics store), e.g. "user/password@dbname_high"
+	// or "user/password@host:port/service_name" for local Oracle DB.
 	ADWDSN string `env:"ADW_DSN,required"`
 
 	JWTSecretKey  string        `env:"JWT_SECRET,required"`
@@ -27,17 +28,21 @@ type Config struct {
 	AdminUsername     string `env:"ADMIN_USERNAME" envDefault:"admin"`
 	AdminPasswordHash string `env:"ADMIN_PASSWORD_HASH,required"`
 
+	// StorageDriver selects the asset store implementation: "local" (disk) or "oci" (OCI Object Storage).
+	StorageDriver       string `env:"STORAGE_DRIVER" envDefault:"local"`
+	LocalStorageDir     string `env:"STORAGE_LOCAL_DIR" envDefault:"./uploads"`
+	LocalStorageBaseURL string `env:"STORAGE_BASE_URL" envDefault:"http://localhost:8080/uploads"`
+
 	// OCI holds Oracle Cloud Infrastructure Object Storage credentials and
-	// target bucket. Namespace may be left empty; it is then resolved via the
-	// Object Storage GetNamespace API at startup.
+	// target bucket. Required only when STORAGE_DRIVER is "oci".
 	OCI struct {
-		TenancyOCID    string `env:"TENANCY_OCID,required"`
-		UserOCID       string `env:"USER_OCID,required"`
-		Fingerprint    string `env:"FINGERPRINT,required"`
-		Region         string `env:"REGION,required"`
-		PrivateKeyPath string `env:"PRIVATE_KEY_PATH,required"`
+		TenancyOCID    string `env:"TENANCY_OCID"`
+		UserOCID       string `env:"USER_OCID"`
+		Fingerprint    string `env:"FINGERPRINT"`
+		Region         string `env:"REGION"`
+		PrivateKeyPath string `env:"PRIVATE_KEY_PATH"`
 		Namespace      string `env:"NAMESPACE"`
-		Bucket         string `env:"BUCKET,required"`
+		Bucket         string `env:"BUCKET"`
 	} `envPrefix:"OCI_"`
 
 	CORSAllowedOrigins []string `env:"CORS_ALLOWED_ORIGINS" envDefault:"http://localhost:3000" envSeparator:","`
@@ -49,6 +54,14 @@ func Load() (*Config, error) {
 	if err := env.Parse(&cfg); err != nil {
 		return nil, fmt.Errorf("config: %w", err)
 	}
+
+	if cfg.StorageDriver == "oci" {
+		if cfg.OCI.TenancyOCID == "" || cfg.OCI.UserOCID == "" || cfg.OCI.Fingerprint == "" ||
+			cfg.OCI.Region == "" || cfg.OCI.PrivateKeyPath == "" || cfg.OCI.Bucket == "" {
+			return nil, fmt.Errorf("config: OCI credentials are required when STORAGE_DRIVER=oci")
+		}
+	}
+
 	return &cfg, nil
 }
 

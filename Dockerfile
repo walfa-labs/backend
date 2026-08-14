@@ -54,6 +54,7 @@ RUN mkdir -p /etc/yum/vars && \
     useradd -u 10001 -m -s /bin/sh appuser
 
 WORKDIR /app
+RUN mkdir -p /app/logs /app/uploads && chown -R appuser:appuser /app
 
 # Copy binary and required static docs
 COPY --from=builder --chown=appuser:appuser /build/bin/api /app/api
