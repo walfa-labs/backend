@@ -8,10 +8,12 @@ import (
 	"github.com/walfa-labs/backend/internal/port"
 )
 
+// AssetHandler handles asset upload, redirect, and delete requests.
 type AssetHandler struct {
 	svc port.AssetService
 }
 
+// NewAssetHandler constructs the asset HTTP handlers bound to the asset service.
 func NewAssetHandler(svc port.AssetService) *AssetHandler {
 	return &AssetHandler{svc: svc}
 }
