@@ -3,6 +3,9 @@ openapi: 3.0.3
 info:
   title: Portfolio API
   version: 1.0.0
+  license:
+    name: WTFPL
+    url: http://www.wtfpl.net/
   description: |
     REST API powering a personal portfolio site: experiences, projects, blog posts,
     tags, stats, a singleton profile, and image assets.

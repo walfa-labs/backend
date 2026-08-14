@@ -4,7 +4,7 @@
 [![Fiber Framework](https://img.shields.io/badge/Fiber-v3.4.0-00ACD7?style=flat&logo=go)](https://gofiber.io)
 [![Database](https://img.shields.io/badge/Oracle-ATP%20%2B%20ADW%20%2B%2023ai-F80000?style=flat&logo=oracle)](https://www.oracle.com/cloud/database/)
 [![Security](https://img.shields.io/badge/DevSecOps-SAST%20%7C%20DAST%20%7C%20SCA-brightgreen?style=flat&logo=securityscorecard)](https://github.com/walfa-labs/backend/actions)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: WTFPL](https://img.shields.io/badge/License-WTFPL-brightgreen.svg)](LICENSE)
 
 A high-performance, enterprise-grade REST API backend for developer portfolios and dynamic content management. Built in Go with the **Fiber v3** framework (fasthttp core), **Sonic JSON** SIMD/JIT parsing, and a clean **Hexagonal Architecture** (Ports & Adapters).
 
@@ -484,4 +484,4 @@ task test:coverage
 
 ## License
 
-Distributed under the MIT License. See [LICENSE](LICENSE) for details.
+Distributed under the WTFPL (Do What The Fuck You Want To Public License). See [LICENSE](LICENSE) for details or visit <http://www.wtfpl.net/>.
