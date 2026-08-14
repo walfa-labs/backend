@@ -34,10 +34,10 @@ jobs:
           go-version: '1.26.x'
           check-latest: true
 
-      - name: Run Gitleaks Secrets Scan
+      - name: Run Gitleaks CLI
         run: |
-          go install github.com/zricethezav/gitleaks/v8@latest
-          gitleaks detect --source=. --config=.gitleaks.toml --verbose --redact
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          gitleaks detect --source . --verbose --redact --config .gitleaks.toml
 
       - name: Run TruffleHog OSS
         uses: trufflesecurity/trufflehog@6f3c981e7b77f235fd2702dd74af25fc4b72bf11 # v3.96.0
