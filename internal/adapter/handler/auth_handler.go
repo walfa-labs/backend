@@ -8,15 +8,18 @@ import (
 	"github.com/walfa-labs/backend/internal/port"
 )
 
+// AuthHandler handles login and token refresh requests.
 type AuthHandler struct {
 	svc         port.AuthService
 	refreshTTLHours int
 }
 
+// NewAuthHandler constructs the auth HTTP handlers bound to the auth service.
 func NewAuthHandler(svc port.AuthService, refreshTTLHours int) *AuthHandler {
 	return &AuthHandler{svc: svc, refreshTTLHours: refreshTTLHours}
 }
 
+// Login validates credentials and returns an access + refresh token pair.
 func (h *AuthHandler) Login(c fiber.Ctx) error {
 	var req loginRequest
 	if err := c.Bind().Body(&req); err != nil {
@@ -46,6 +49,7 @@ func (h *AuthHandler) Login(c fiber.Ctx) error {
 	}})
 }
 
+// Refresh validates a refresh token and returns a new access token.
 func (h *AuthHandler) Refresh(c fiber.Ctx) error {
 	// Prefer httpOnly cookie, fall back to body.
 	refreshToken := c.Cookies("refresh_token")
