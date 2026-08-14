@@ -12,6 +12,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// AuthService implements login and token refresh against the admin user table.
 type AuthService struct {
 	adminRepo  port.AdminRepo
 	jwtSecret  []byte
@@ -19,6 +20,7 @@ type AuthService struct {
 	refreshTTL time.Duration
 }
 
+// NewAuthService constructs an AuthService with the JWT secret and token TTLs.
 func NewAuthService(adminRepo port.AdminRepo, jwtSecret string, accessTTL, refreshTTL time.Duration) *AuthService {
 	return &AuthService{
 		adminRepo:  adminRepo,
