@@ -51,7 +51,7 @@ func (r *ExperienceRepo) List(ctx context.Context) ([]domain.Experience, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []domain.Experience
 	for rows.Next() {
@@ -173,7 +173,7 @@ func (r *ExperienceRepo) fetchHighlights(ctx context.Context, experienceID uuid.
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []domain.ExperienceHighlight
 	for rows.Next() {
