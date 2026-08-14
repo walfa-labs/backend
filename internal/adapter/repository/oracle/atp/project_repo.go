@@ -91,7 +91,7 @@ func (r *ProjectRepo) ListPublished(ctx context.Context, filter port.ProjectFilt
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []domain.Project
 	for rows.Next() {
@@ -114,7 +114,7 @@ func (r *ProjectRepo) ListAll(ctx context.Context) ([]domain.Project, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []domain.Project
 	for rows.Next() {
@@ -265,7 +265,7 @@ func (r *ProjectRepo) fetchLinks(ctx context.Context, projectID uuid.UUID) ([]do
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []domain.ProjectLink
 	for rows.Next() {
