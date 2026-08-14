@@ -13,6 +13,7 @@ type HealthHandler struct {
 	adw *sql.DB
 }
 
+// NewHealthHandler constructs the health HTTP handlers.
 func NewHealthHandler(atp, adw *sql.DB) *HealthHandler {
 	return &HealthHandler{atp: atp, adw: adw}
 }
