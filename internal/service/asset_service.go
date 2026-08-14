@@ -12,11 +12,13 @@ import (
 	"github.com/walfa-labs/backend/internal/port"
 )
 
+// AssetService implements the asset use cases: upload, URL resolution, and deletion.
 type AssetService struct {
 	assetRepo  port.AssetRepo
 	assetStore port.AssetStore
 }
 
+// NewAssetService constructs an AssetService from the asset repo and object store.
 func NewAssetService(assetRepo port.AssetRepo, assetStore port.AssetStore) *AssetService {
 	return &AssetService{
 		assetRepo:  assetRepo,
@@ -24,6 +26,7 @@ func NewAssetService(assetRepo port.AssetRepo, assetStore port.AssetStore) *Asse
 	}
 }
 
+// Upload validates the content type, stores the object, and records the asset row.
 func (s *AssetService) Upload(ctx context.Context, r io.ReadSeeker, contentType string, size int64) (*domain.Asset, error) {
 	if err := domain.ValidateAssetContentType(contentType); err != nil {
 		return nil, err
@@ -56,6 +59,7 @@ func (s *AssetService) Upload(ctx context.Context, r io.ReadSeeker, contentType 
 	return asset, nil
 }
 
+// GetURL returns a short-lived pre-authenticated URL for the asset with the given key.
 func (s *AssetService) GetURL(ctx context.Context, key string) (string, error) {
 	asset, err := s.assetRepo.GetByKey(ctx, key)
 	if err != nil {
@@ -64,6 +68,7 @@ func (s *AssetService) GetURL(ctx context.Context, key string) (string, error) {
 	return s.assetStore.Presign(ctx, asset.Key)
 }
 
+// Delete removes the object and its database record (DB row is the source of truth).
 func (s *AssetService) Delete(ctx context.Context, key string) error {
 	_ = s.assetStore.Delete(ctx, key) // Best-effort: proceed — the DB record is the source of truth.
 	return s.assetRepo.DeleteByKey(ctx, key)
