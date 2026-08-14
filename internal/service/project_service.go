@@ -10,14 +10,17 @@ import (
 	"github.com/walfa-labs/backend/internal/port"
 )
 
+// ProjectService implements CRUD and published-read use cases for projects.
 type ProjectService struct {
 	repo port.ProjectRepo
 }
 
+// NewProjectService constructs a ProjectService bound to the given repo.
 func NewProjectService(repo port.ProjectRepo) *ProjectService {
 	return &ProjectService{repo: repo}
 }
 
+// ListPublished returns published projects, optionally filtered to featured ones.
 func (s *ProjectService) ListPublished(ctx context.Context, featured *bool) ([]domain.Project, error) {
 	f := port.ProjectFilter{}
 	if featured != nil {
@@ -27,10 +30,12 @@ func (s *ProjectService) ListPublished(ctx context.Context, featured *bool) ([]d
 	return s.repo.ListPublished(ctx, f)
 }
 
+// ListAll returns every project, including drafts.
 func (s *ProjectService) ListAll(ctx context.Context) ([]domain.Project, error) {
 	return s.repo.ListAll(ctx)
 }
 
+// GetPublishedBySlug returns a published project by slug, or ErrNotFound.
 func (s *ProjectService) GetPublishedBySlug(ctx context.Context, slug string) (*domain.Project, error) {
 	p, err := s.repo.GetBySlug(ctx, slug)
 	if err != nil {
@@ -42,10 +47,12 @@ func (s *ProjectService) GetPublishedBySlug(ctx context.Context, slug string) (*
 	return p, nil
 }
 
+// Get returns any project by id, including drafts.
 func (s *ProjectService) Get(ctx context.Context, id uuid.UUID) (*domain.Project, error) {
 	return s.repo.GetByID(ctx, id)
 }
 
+// Create validates the input and persists a new project.
 func (s *ProjectService) Create(ctx context.Context, input port.ProjectInput) (*domain.Project, error) {
 	if err := validateProjectInput(input); err != nil {
 		return nil, err
@@ -61,6 +68,7 @@ func (s *ProjectService) Create(ctx context.Context, input port.ProjectInput) (*
 	return p, nil
 }
 
+// Update validates the input and persists changes to an existing project.
 func (s *ProjectService) Update(ctx context.Context, id uuid.UUID, input port.ProjectInput) (*domain.Project, error) {
 	if err := validateProjectInput(input); err != nil {
 		return nil, err
@@ -81,6 +89,7 @@ func (s *ProjectService) Update(ctx context.Context, id uuid.UUID, input port.Pr
 	return p, nil
 }
 
+// Delete removes the project with the given id.
 func (s *ProjectService) Delete(ctx context.Context, id uuid.UUID) error {
 	return s.repo.Delete(ctx, id)
 }

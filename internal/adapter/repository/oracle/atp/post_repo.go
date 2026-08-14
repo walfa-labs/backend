@@ -65,7 +65,7 @@ func (r *PostRepo) ListPublished(ctx context.Context, filter port.PostFilter) ([
 		if err != nil {
 			return nil, err
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		return r.scanSummaries(ctx, rows)
 	}
 
@@ -80,7 +80,7 @@ func (r *PostRepo) ListPublished(ctx context.Context, filter port.PostFilter) ([
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return r.scanSummaries(ctx, rows)
 }
 
@@ -122,7 +122,7 @@ func (r *PostRepo) fetchTags(ctx context.Context, postID uuid.UUID) ([]domain.Ta
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []domain.Tag
 	for rows.Next() {
@@ -141,7 +141,7 @@ func (r *PostRepo) ListAll(ctx context.Context) ([]domain.BlogPost, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []domain.BlogPost
 	for rows.Next() {
@@ -198,7 +198,7 @@ func (r *PostRepo) Create(ctx context.Context, p *domain.BlogPost) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO blog_posts
@@ -231,7 +231,7 @@ func (r *PostRepo) Update(ctx context.Context, p *domain.BlogPost) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	res, err := tx.ExecContext(ctx, `
 		UPDATE blog_posts SET

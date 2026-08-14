@@ -13,6 +13,7 @@ type HealthHandler struct {
 	adw *sql.DB
 }
 
+// NewHealthHandler constructs the health HTTP handlers.
 func NewHealthHandler(atp, adw *sql.DB) *HealthHandler {
 	return &HealthHandler{atp: atp, adw: adw}
 }
@@ -21,16 +22,21 @@ func NewHealthHandler(atp, adw *sql.DB) *HealthHandler {
 func (h *HealthHandler) Health(c fiber.Ctx) error {
 	status := "ok"
 	dbStatus := "up"
-	if err := h.atp.PingContext(c.Context()); err != nil {
-		status = "degraded"
-		dbStatus = "down"
+	if h.atp != nil {
+		if err := h.atp.PingContext(c.Context()); err != nil {
+			status = "degraded"
+			dbStatus = "down"
+		}
 	}
-	if err := h.adw.PingContext(c.Context()); err != nil {
-		status = "degraded"
-		dbStatus = "down"
+	if h.adw != nil {
+		if err := h.adw.PingContext(c.Context()); err != nil {
+			status = "degraded"
+			dbStatus = "down"
+		}
 	}
 	return c.JSON(fiber.Map{
 		"status": status,
 		"db":     dbStatus,
 	})
 }
+

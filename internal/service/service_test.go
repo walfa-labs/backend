@@ -280,12 +280,12 @@ func TestProjectService(t *testing.T) {
 			t.Errorf("expected title '%s', got '%s'", input.Title, fetched.Title)
 		}
 
-		byId, err := projSvc.Get(ctx, created.ID)
+		byID, err := projSvc.Get(ctx, created.ID)
 		if err != nil {
 			t.Fatalf("unexpected get by id error: %v", err)
 		}
-		if byId.Slug != "portfolio-backend" {
-			t.Errorf("expected slug 'portfolio-backend', got '%s'", byId.Slug)
+		if byID.Slug != "portfolio-backend" {
+			t.Errorf("expected slug 'portfolio-backend', got '%s'", byID.Slug)
 		}
 	})
 

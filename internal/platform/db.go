@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	_ "github.com/godror/godror"
+	_ "github.com/godror/godror" // Register godror database/sql driver
 )
 
 // NewOracleDB opens a database/sql pool against an Oracle Database (ATP or
@@ -23,7 +23,7 @@ func NewOracleDB(ctx context.Context, dsn string) (*sql.DB, error) {
 	}
 
 	if err := db.PingContext(ctx); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("ping oracle: %w", err)
 	}
 

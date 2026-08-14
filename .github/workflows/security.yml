@@ -2,9 +2,9 @@ name: DevSecOps Security Scan
 
 on:
   push:
-    branches: [main, master, dev]
+    branches: [main, dev]
   pull_request:
-    branches: [main, master, dev]
+    branches: [main, dev]
   schedule:
     - cron: '0 6 * * 1' # Every Monday at 06:00 UTC
   workflow_dispatch:
@@ -24,24 +24,27 @@ jobs:
       contents: read
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - name: Run Gitleaks Secrets Scan
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_CONFIG: .gitleaks.toml
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: true
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.6'
 
-      - name: Run TruffleHog Secrets Scan
-        uses: trufflesecurity/trufflehog@main
+      - name: Run Gitleaks CLI
+        run: |
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          gitleaks detect --source . --verbose --redact --config .gitleaks.toml
+
+      - name: Run TruffleHog OSS
+        uses: trufflesecurity/trufflehog@6f3c981e7b77f235fd2702dd74af25fc4b72bf11 # v3.96.0
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
-          extra_args: --only-verified
+          extra_args: --debug --only-verified
 
   sast-gosec:
     name: SAST - Gosec Security Analyzer
@@ -51,47 +54,44 @@ jobs:
       security-events: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.x'
+          go-version: '1.26.6'
           check-latest: true
 
-      - name: Install Gosec
+      - name: Run Gosec Security Scanner
         run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
+          gosec -fmt=sarif -out=gosec.sarif -exclude-dir=.git -severity=medium -confidence=medium ./...
 
-      - name: Run Gosec Scan
-        run: |
-          gosec -fmt=sarif -out=gosec-results.sarif -stdout -verbose=text ./... || true
-
-      - name: Upload Gosec SARIF Results
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Upload Gosec SARIF Report
+        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         if: always()
         with:
-          sarif_file: gosec-results.sarif
+          sarif_file: gosec.sarif
           category: gosec
 
   sast-semgrep:
     name: SAST - Semgrep Security Analysis
     runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:1.173.0
     permissions:
       contents: read
       security-events: write
-    container:
-      image: semgrep/semgrep:latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Run Semgrep Rules
+      - name: Run Semgrep OSS Scan
         run: |
-          semgrep scan --config auto --sarif --output semgrep.sarif || true
+          semgrep scan --config auto --sarif --output semgrep.sarif
 
       - name: Upload Semgrep SARIF Report
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         if: always()
         with:
           sarif_file: semgrep.sarif
@@ -104,18 +104,18 @@ jobs:
       contents: read
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.x'
+          go-version: '1.26.6'
           check-latest: true
 
       - name: Run govulncheck
-        uses: golang/govulncheck-action@v1
+        uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
         with:
-          go-version-input: '1.26.x'
+          go-version-input: '1.26.6'
           go-package: ./...
 
   sca-trivy-fs:
@@ -126,10 +126,10 @@ jobs:
       security-events: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Run Trivy FS Scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -138,7 +138,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy FS SARIF Report
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         if: always()
         with:
           sarif_file: trivy-fs-results.sarif
@@ -150,21 +150,13 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      actions: read
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Run Zizmor Workflow Audit
-        uses: woodruffw/zizmor-action@v0.8.0
-        with:
-          args: --format sarif .github/workflows/ > zizmor-results.sarif || true
-
-      - name: Upload Zizmor SARIF Report
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: zizmor-results.sarif
-          category: zizmor
+        uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
 
   codeql:
     name: SAST - GitHub CodeQL Analysis
@@ -174,14 +166,14 @@ jobs:
       security-events: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           languages: go
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           category: codeql-go

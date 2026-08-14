@@ -620,6 +620,29 @@ func TestPostHandler(t *testing.T) {
 		}
 	})
 
+	t.Run("GET /admin/posts/:id includes status", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/admin/posts/"+postID.String(), nil)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("request error: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+		var envelope struct {
+			Data struct {
+				Status string `json:"status"`
+			} `json:"data"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+			t.Fatalf("decode error: %v", err)
+		}
+		if envelope.Data.Status != "published" {
+			t.Errorf("expected status published, got %q", envelope.Data.Status)
+		}
+	})
+
 	t.Run("PATCH /posts/:id/status", func(t *testing.T) {
 		payload := map[string]string{"status": "published"}
 		b, _ := json.Marshal(payload)

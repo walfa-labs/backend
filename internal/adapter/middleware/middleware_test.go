@@ -324,3 +324,29 @@ func TestRecoverMiddleware(t *testing.T) {
 		t.Errorf("expected code '%s', got '%s'", middleware.CodeInternalError, env.Error.Code)
 	}
 }
+
+func TestSecurityHeaders(t *testing.T) {
+	app := fiber.New()
+	app.Use(middleware.SecurityHeaders())
+	app.Get("/test", func(c fiber.Ctx) error {
+		return c.SendString("ok")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.Header.Get("X-Content-Type-Options") != "nosniff" {
+		t.Errorf("expected X-Content-Type-Options: nosniff, got %s", resp.Header.Get("X-Content-Type-Options"))
+	}
+	if resp.Header.Get("X-Frame-Options") != "DENY" {
+		t.Errorf("expected X-Frame-Options: DENY, got %s", resp.Header.Get("X-Frame-Options"))
+	}
+	if resp.Header.Get("Cross-Origin-Resource-Policy") != "cross-origin" {
+		t.Errorf("expected Cross-Origin-Resource-Policy: cross-origin, got %s", resp.Header.Get("Cross-Origin-Resource-Policy"))
+	}
+}
+

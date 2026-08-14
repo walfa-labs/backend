@@ -9,14 +9,17 @@ import (
 	"github.com/walfa-labs/backend/internal/port"
 )
 
+// ExperienceHandler handles experience request endpoints.
 type ExperienceHandler struct {
 	svc port.ExperienceService
 }
 
+// NewExperienceHandler constructs the experience HTTP handlers bound to the experience service.
 func NewExperienceHandler(svc port.ExperienceService) *ExperienceHandler {
 	return &ExperienceHandler{svc: svc}
 }
 
+// List returns all experiences (public endpoint).
 func (h *ExperienceHandler) List(c fiber.Ctx) error {
 	experiences, err := h.svc.List(c.Context())
 	if err != nil {
@@ -29,6 +32,7 @@ func (h *ExperienceHandler) List(c fiber.Ctx) error {
 	return OK(c, results)
 }
 
+// Get returns one experience by id.
 func (h *ExperienceHandler) Get(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -44,6 +48,7 @@ func (h *ExperienceHandler) Get(c fiber.Ctx) error {
 	return OK(c, toExperienceResponse(e))
 }
 
+// Create validates input and persists a new experience.
 func (h *ExperienceHandler) Create(c fiber.Ctx) error {
 	var req experienceRequest
 	if err := c.Bind().Body(&req); err != nil {
@@ -60,6 +65,7 @@ func (h *ExperienceHandler) Create(c fiber.Ctx) error {
 	return Created(c, "/api/v1/admin/experiences/"+e.ID.String(), toExperienceResponse(e))
 }
 
+// Update validates input and persists changes to an existing experience.
 func (h *ExperienceHandler) Update(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -81,6 +87,7 @@ func (h *ExperienceHandler) Update(c fiber.Ctx) error {
 	return c.JSON(SuccessEnvelope{Data: toExperienceResponse(e)})
 }
 
+// Delete removes the experience with the given id.
 func (h *ExperienceHandler) Delete(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {

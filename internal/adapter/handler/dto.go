@@ -9,6 +9,7 @@ import (
 
 // --- Experience DTOs ---
 
+// ExperienceResponse is the API representation of an experience.
 type ExperienceResponse struct {
 	ID              string                   `json:"id"`
 	ExperienceType  string                   `json:"experienceType"`
@@ -23,6 +24,7 @@ type ExperienceResponse struct {
 	Highlights      []HighlightResponse     `json:"highlights"`
 }
 
+// HighlightResponse is the API representation of an experience highlight.
 type HighlightResponse struct {
 	ID           string `json:"id"`
 	BodyMarkdown string `json:"bodyMarkdown"`
@@ -110,6 +112,7 @@ func (r experienceRequest) toInput() (port.ExperienceInput, error) {
 
 // --- Project DTOs ---
 
+// ProjectResponse is the API representation of a project.
 type ProjectResponse struct {
 	ID                  string           `json:"id"`
 	Slug                string           `json:"slug"`
@@ -127,6 +130,7 @@ type ProjectResponse struct {
 	Links               []LinkResponse   `json:"links"`
 }
 
+// LinkResponse is the API representation of a project link.
 type LinkResponse struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
@@ -224,6 +228,7 @@ func (r projectRequest) toInput() (port.ProjectInput, error) {
 
 // --- Post DTOs ---
 
+// PostSummaryResponse is the API representation of a post summary.
 type PostSummaryResponse struct {
 	ID            string      `json:"id"`
 	Slug          string      `json:"slug"`
@@ -234,12 +239,15 @@ type PostSummaryResponse struct {
 	Tags          []TagResponse `json:"tags"`
 }
 
+// PostResponse is the API representation of a full blog post.
 type PostResponse struct {
 	PostSummaryResponse
 	BodyMarkdown string `json:"bodyMarkdown"`
 	ViewCount    int    `json:"viewCount"`
+	Status       string `json:"status"`
 }
 
+// TagResponse is the API representation of a tag.
 type TagResponse struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -277,6 +285,7 @@ func toPostResponse(p *domain.BlogPost) PostResponse {
 		},
 		BodyMarkdown: p.BodyMarkdown,
 		ViewCount:    p.ViewCount,
+		Status:       string(p.Status),
 	}
 	if p.PublishedAt != nil {
 		t := p.PublishedAt.Format(time.RFC3339)
@@ -325,6 +334,7 @@ func (r postRequest) toInput() port.PostInput {
 
 // --- Stats DTOs ---
 
+// StatsSummaryResponse is the API representation of the stats summary.
 type StatsSummaryResponse struct {
 	PublishedPosts    int   `json:"publishedPosts"`
 	PublishedProjects int   `json:"publishedProjects"`
@@ -385,6 +395,7 @@ func toAssetResponse(a *domain.Asset) assetResponse {
 
 // --- Profile DTOs ---
 
+// ProfileResponse is the API representation of the profile.
 type ProfileResponse struct {
 	Name        string `json:"name"`
 	Email       string `json:"email"`

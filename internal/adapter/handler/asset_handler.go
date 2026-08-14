@@ -8,10 +8,12 @@ import (
 	"github.com/walfa-labs/backend/internal/port"
 )
 
+// AssetHandler handles asset upload, redirect, and delete requests.
 type AssetHandler struct {
 	svc port.AssetService
 }
 
+// NewAssetHandler constructs the asset HTTP handlers bound to the asset service.
 func NewAssetHandler(svc port.AssetService) *AssetHandler {
 	return &AssetHandler{svc: svc}
 }
@@ -30,7 +32,7 @@ func (h *AssetHandler) Upload(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	asset, err := h.svc.Upload(c.Context(), f, file.Header.Get("Content-Type"), file.Size)
 	if err != nil {

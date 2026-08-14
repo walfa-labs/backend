@@ -25,7 +25,7 @@ func (r *TagRepo) List(ctx context.Context) ([]domain.Tag, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []domain.Tag
 	for rows.Next() {

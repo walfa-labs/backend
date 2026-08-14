@@ -9,6 +9,7 @@ import (
 // ContentStatus governs visibility: only published items appear on public endpoints.
 type ContentStatus string
 
+// Content status values for draft and published items.
 const (
 	StatusDraft     ContentStatus = "draft"
 	StatusPublished ContentStatus = "published"
@@ -17,6 +18,7 @@ const (
 // LinkKind categorizes a project's external link.
 type LinkKind string
 
+// Recognized project link kinds.
 const (
 	LinkKindRepo  LinkKind = "repo"
 	LinkKindDemo  LinkKind = "demo"

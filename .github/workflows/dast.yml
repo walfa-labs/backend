@@ -26,7 +26,7 @@ jobs:
       issues: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Build Local Container Image
         run: |
@@ -35,10 +35,10 @@ jobs:
       - name: Create Test Environment File
         run: |
           cat << 'EOF' > .env.dast
-          APP_ENV=development
+          APP_ENV=dast
           APP_PORT=:8080
-          ATP_DSN=portfolio/mock@mock_atp
-          ADW_DSN=portfolio/mock@mock_adw
+          ATP_DSN=mock
+          ADW_DSN=mock
           JWT_SECRET=dast-test-secret-key-1234567890
           ADMIN_USERNAME=admin
           ADMIN_PASSWORD_HASH=$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
@@ -56,7 +56,7 @@ jobs:
           docker run -d --name backend-app \
             --env-file .env.dast \
             --network host \
-            portfolio-backend:dast || true
+            portfolio-backend:dast
 
       - name: Wait for API Server to Start
         run: |
@@ -70,22 +70,22 @@ jobs:
           done
 
       - name: Run OWASP ZAP API Scan
-        uses: zaproxy/action-api-scan@v0.9.0
+        uses: zaproxy/action-api-scan@5158fe4d9d8fcc75ea204db81317cce7f9e5453d # v0.10.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           docker_name: 'ghcr.io/zaproxy/zaproxy:stable'
           format: openapi
           target: 'docs/openapi.yaml'
-          cmd_options: '-u http://127.0.0.1:8080 -r dast-report.html -w dast-report.md'
-          fail_action: false
+          cmd_options: '-O http://127.0.0.1:8080'
+          fail_action: true
 
       - name: Upload ZAP DAST Scan Reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: zap-dast-security-report
           path: |
-            dast-report.html
-            dast-report.md
+            report_html.html
+            report_md.md
             report_json.json
           retention-days: 14

@@ -56,7 +56,7 @@ type Asset struct {
 	UploadedAt  time.Time
 }
 
-// AssetKind infers a storage key prefix from the content type.
+// AssetKeyPrefix infers a storage key prefix from the content type.
 func AssetKeyPrefix(contentType string) string {
 	switch {
 	case len(contentType) > 5 && contentType[:5] == "image":

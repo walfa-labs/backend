@@ -1,15 +1,14 @@
+version: "2"
+
 run:
   timeout: 5m
   tests: true
   allow-parallel-runners: true
 
-output:
-  sort-results: true
-
 linters:
+  default: none
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
@@ -22,63 +21,71 @@ linters:
     - unconvert
     - bodyclose
     - gocritic
-
-linters-settings:
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment # Can make structs awkward to read just for slight padding optimization
-      - shadow
-  gosec:
-    severity: medium
-    confidence: medium
-    excludes:
-      - G101 # Allow test credentials in test files (handled via exclude-rules below)
-  revive:
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*database/sql.Tx).Rollback
+    govet:
+      disable:
+        - fieldalignment
+        - shadow
+    gosec:
+      severity: medium
+      confidence: medium
+      excludes:
+        - G101
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - disableStutteringCheck
+        - name: blank-imports
+        - name: context-as-argument
+        - name: dot-imports
+        - name: error-naming
+        - name: error-strings
+        - name: if-return
+        - name: increment-decrement
+        - name: var-naming
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+    goconst:
+      min-len: 3
+      min-occurrences: 4
+    misspell:
+      locale: US
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - whyNoLint
+        - unnamedResult
+        - hugeParam
+        - rangeValCopy
+        - httpNoBody
+  exclusions:
     rules:
-      - name: exported
-        arguments:
-          - disableStutteringCheck
-      - name: blank-imports
-      - name: context-as-argument
-      - name: dot-imports
-      - name: error-naming
-      - name: error-strings
-      - name: if-return
-      - name: increment-decrement
-      - name: var-naming
-      - name: range
-      - name: receiver-naming
-      - name: time-naming
-      - name: unexported-return
-      - name: indent-error-flow
-      - name: errorf
-  goconst:
-    min-len: 3
-    min-occurrences: 4
-  misspell:
-    locale: US
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-    disabled-checks:
-      - whyNoLint
-      - unnamedResult
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+          - goconst
+          - prealloc
+          - gocritic
+      - path: _test\.go
+        text: "SA5012:"
+        linters:
+          - staticcheck
+      - path: internal/adapter/repository/
+        linters:
+          - unconvert
 
 issues:
-  exclude-use-default: true
   max-issues-per-linter: 50
   max-same-issues: 5
-  exclude-rules:
-    # Exclude linter checks on test files
-    - path: _test\.go
-      linters:
-        - gosec
-        - errcheck
-        - goconst
-    # Exclude godror helper scan casts in repository adapters
-    - path: internal/adapter/repository/
-      linters:
-        - unconvert

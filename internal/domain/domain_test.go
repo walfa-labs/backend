@@ -63,7 +63,8 @@ func TestDomainErrors(t *testing.T) {
 			}
 		}()
 
-		domain.NewValidationError("username", "cannot be empty", "dangling")
+		oddArgs := append([]string{"username", "cannot be empty"}, "dangling")
+		domain.NewValidationError(oddArgs...) //nolint:staticcheck // testing odd arguments panic
 	})
 }
 

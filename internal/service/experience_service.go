@@ -11,18 +11,22 @@ import (
 	"github.com/walfa-labs/backend/internal/port"
 )
 
+// ExperienceService implements CRUD for portfolio experience entries.
 type ExperienceService struct {
 	repo port.ExperienceRepo
 }
 
+// NewExperienceService constructs an ExperienceService bound to the given repo.
 func NewExperienceService(repo port.ExperienceRepo) *ExperienceService {
 	return &ExperienceService{repo: repo}
 }
 
+// List returns all experience entries in display order.
 func (s *ExperienceService) List(ctx context.Context) ([]domain.Experience, error) {
 	return s.repo.List(ctx)
 }
 
+// Get returns the experience entry with the given id, or ErrNotFound.
 func (s *ExperienceService) Get(ctx context.Context, id uuid.UUID) (*domain.Experience, error) {
 	e, err := s.repo.GetByID(ctx, id)
 	if err != nil {
@@ -34,6 +38,7 @@ func (s *ExperienceService) Get(ctx context.Context, id uuid.UUID) (*domain.Expe
 	return e, nil
 }
 
+// Create validates the input and persists a new experience entry.
 func (s *ExperienceService) Create(ctx context.Context, input port.ExperienceInput) (*domain.Experience, error) {
 	if err := validateExperienceInput(input); err != nil {
 		return nil, err
@@ -45,6 +50,7 @@ func (s *ExperienceService) Create(ctx context.Context, input port.ExperienceInp
 	return e, nil
 }
 
+// Update validates the input and persists changes to an existing experience entry.
 func (s *ExperienceService) Update(ctx context.Context, id uuid.UUID, input port.ExperienceInput) (*domain.Experience, error) {
 	if err := validateExperienceInput(input); err != nil {
 		return nil, err
@@ -60,6 +66,7 @@ func (s *ExperienceService) Update(ctx context.Context, id uuid.UUID, input port
 	return e, nil
 }
 
+// Delete removes the experience entry with the given id.
 func (s *ExperienceService) Delete(ctx context.Context, id uuid.UUID) error {
 	return s.repo.Delete(ctx, id)
 }

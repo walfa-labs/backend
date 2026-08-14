@@ -51,7 +51,7 @@ func (r *ExperienceRepo) List(ctx context.Context) ([]domain.Experience, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []domain.Experience
 	for rows.Next() {
@@ -89,7 +89,7 @@ func (r *ExperienceRepo) Create(ctx context.Context, e *domain.Experience) error
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO experiences
@@ -122,7 +122,7 @@ func (r *ExperienceRepo) Update(ctx context.Context, e *domain.Experience) error
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	res, err := tx.ExecContext(ctx, `
 		UPDATE experiences SET
@@ -173,7 +173,7 @@ func (r *ExperienceRepo) fetchHighlights(ctx context.Context, experienceID uuid.
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []domain.ExperienceHighlight
 	for rows.Next() {

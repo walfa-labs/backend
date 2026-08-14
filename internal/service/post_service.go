@@ -11,11 +11,13 @@ import (
 	"github.com/walfa-labs/backend/internal/port"
 )
 
+// PostService implements post use cases including published-read view tracking.
 type PostService struct {
 	repo      port.PostRepo
 	analytics port.AnalyticsStore
 }
 
+// NewPostService constructs a PostService bound to the post repo and analytics store.
 func NewPostService(repo port.PostRepo, analytics port.AnalyticsStore) *PostService {
 	return &PostService{repo: repo, analytics: analytics}
 }
@@ -40,10 +42,12 @@ func (s *PostService) ListPublished(ctx context.Context, filter port.PostFilter)
 	return posts, total, nil
 }
 
+// ListAll returns every post, including drafts.
 func (s *PostService) ListAll(ctx context.Context) ([]domain.BlogPost, error) {
 	return s.repo.ListAll(ctx)
 }
 
+// GetPublishedBySlug returns one published post by slug and best-effort records a view.
 func (s *PostService) GetPublishedBySlug(ctx context.Context, slug string) (*domain.BlogPost, error) {
 	p, err := s.repo.GetPublishedBySlug(ctx, slug)
 	if err != nil {
@@ -67,10 +71,12 @@ func (s *PostService) GetPublishedBySlug(ctx context.Context, slug string) (*dom
 	return p, nil
 }
 
+// Get returns any post by id, including drafts.
 func (s *PostService) Get(ctx context.Context, id uuid.UUID) (*domain.BlogPost, error) {
 	return s.repo.GetByID(ctx, id)
 }
 
+// Create validates the input and persists a new post.
 func (s *PostService) Create(ctx context.Context, input port.PostInput) (*domain.BlogPost, error) {
 	if err := validatePostInput(input); err != nil {
 		return nil, err
@@ -86,6 +92,7 @@ func (s *PostService) Create(ctx context.Context, input port.PostInput) (*domain
 	return p, nil
 }
 
+// Update validates the input and persists changes to an existing post.
 func (s *PostService) Update(ctx context.Context, id uuid.UUID, input port.PostInput) (*domain.BlogPost, error) {
 	if err := validatePostInput(input); err != nil {
 		return nil, err
@@ -105,10 +112,12 @@ func (s *PostService) Update(ctx context.Context, id uuid.UUID, input port.PostI
 	return p, nil
 }
 
+// Delete removes the post with the given id.
 func (s *PostService) Delete(ctx context.Context, id uuid.UUID) error {
 	return s.repo.Delete(ctx, id)
 }
 
+// SetStatus transitions a post to draft or published, stamping published_at on publish.
 func (s *PostService) SetStatus(ctx context.Context, id uuid.UUID, status domain.ContentStatus) (*domain.BlogPost, error) {
 	if status != domain.StatusDraft && status != domain.StatusPublished {
 		return nil, domain.NewValidationError("status", "must be 'draft' or 'published'")

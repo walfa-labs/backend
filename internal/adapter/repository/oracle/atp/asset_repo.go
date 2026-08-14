@@ -24,7 +24,7 @@ func (r *AssetRepo) Create(ctx context.Context, a *domain.Asset) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO assets (asset_id, key, url, content_type, size_bytes)

@@ -9,6 +9,7 @@ import (
 // ExperienceType distinguishes employment from study.
 type ExperienceType string
 
+// Recognized experience types.
 const (
 	ExperienceTypeWork      ExperienceType = "work"
 	ExperienceTypeEducation ExperienceType = "education"

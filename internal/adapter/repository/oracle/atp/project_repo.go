@@ -91,7 +91,7 @@ func (r *ProjectRepo) ListPublished(ctx context.Context, filter port.ProjectFilt
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []domain.Project
 	for rows.Next() {
@@ -114,7 +114,7 @@ func (r *ProjectRepo) ListAll(ctx context.Context) ([]domain.Project, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []domain.Project
 	for rows.Next() {
@@ -174,7 +174,7 @@ func (r *ProjectRepo) Create(ctx context.Context, p *domain.Project) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO projects
@@ -212,7 +212,7 @@ func (r *ProjectRepo) Update(ctx context.Context, p *domain.Project) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	res, err := tx.ExecContext(ctx, `
 		UPDATE projects SET
@@ -265,7 +265,7 @@ func (r *ProjectRepo) fetchLinks(ctx context.Context, projectID uuid.UUID) ([]do
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []domain.ProjectLink
 	for rows.Next() {
