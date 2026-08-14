@@ -151,6 +151,7 @@ type AdminRepo struct {
 	user *domain.AdminUser
 }
 
+// GetByUsername returns the admin user if the username matches.
 func (r *AdminRepo) GetByUsername(ctx context.Context, username string) (*domain.AdminUser, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -167,6 +168,7 @@ type ExperienceRepo struct {
 	data map[uuid.UUID]domain.Experience
 }
 
+// List returns all experiences ordered by sort order.
 func (r *ExperienceRepo) List(ctx context.Context) ([]domain.Experience, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -180,6 +182,7 @@ func (r *ExperienceRepo) List(ctx context.Context) ([]domain.Experience, error) 
 	return list, nil
 }
 
+// GetByID returns the experience with the given id, or ErrNotFound.
 func (r *ExperienceRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Experience, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -190,6 +193,7 @@ func (r *ExperienceRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Exp
 	return &e, nil
 }
 
+// Create stores a new experience.
 func (r *ExperienceRepo) Create(ctx context.Context, e *domain.Experience) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -197,6 +201,7 @@ func (r *ExperienceRepo) Create(ctx context.Context, e *domain.Experience) error
 	return nil
 }
 
+// Update replaces an existing experience, or returns ErrNotFound.
 func (r *ExperienceRepo) Update(ctx context.Context, e *domain.Experience) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -207,6 +212,7 @@ func (r *ExperienceRepo) Update(ctx context.Context, e *domain.Experience) error
 	return nil
 }
 
+// Delete removes the experience with the given id, or returns ErrNotFound.
 func (r *ExperienceRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -223,6 +229,7 @@ type ProjectRepo struct {
 	data map[uuid.UUID]domain.Project
 }
 
+// ListPublished returns published projects, optionally filtered to featured.
 func (r *ProjectRepo) ListPublished(ctx context.Context, filter port.ProjectFilter) ([]domain.Project, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -241,6 +248,7 @@ func (r *ProjectRepo) ListPublished(ctx context.Context, filter port.ProjectFilt
 	return list, nil
 }
 
+// ListAll returns every project.
 func (r *ProjectRepo) ListAll(ctx context.Context) ([]domain.Project, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -254,6 +262,7 @@ func (r *ProjectRepo) ListAll(ctx context.Context) ([]domain.Project, error) {
 	return list, nil
 }
 
+// GetBySlug returns the project with the given slug, or ErrNotFound.
 func (r *ProjectRepo) GetBySlug(ctx context.Context, slug string) (*domain.Project, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -266,6 +275,7 @@ func (r *ProjectRepo) GetBySlug(ctx context.Context, slug string) (*domain.Proje
 	return nil, domain.ErrNotFound
 }
 
+// GetByID returns the project with the given id, or ErrNotFound.
 func (r *ProjectRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Project, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -276,6 +286,7 @@ func (r *ProjectRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Projec
 	return &p, nil
 }
 
+// Create stores a new project.
 func (r *ProjectRepo) Create(ctx context.Context, p *domain.Project) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -283,6 +294,7 @@ func (r *ProjectRepo) Create(ctx context.Context, p *domain.Project) error {
 	return nil
 }
 
+// Update replaces an existing project, or returns ErrNotFound.
 func (r *ProjectRepo) Update(ctx context.Context, p *domain.Project) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -293,6 +305,7 @@ func (r *ProjectRepo) Update(ctx context.Context, p *domain.Project) error {
 	return nil
 }
 
+// Delete removes the project with the given id, or returns ErrNotFound.
 func (r *ProjectRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -309,6 +322,7 @@ type PostRepo struct {
 	data map[uuid.UUID]domain.BlogPost
 }
 
+// ListPublished returns published post summaries for a page.
 func (r *PostRepo) ListPublished(ctx context.Context, filter port.PostFilter) ([]port.PostSummary, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -341,6 +355,7 @@ func (r *PostRepo) ListPublished(ctx context.Context, filter port.PostFilter) ([
 	return list, nil
 }
 
+// CountPublished returns the total number of published posts.
 func (r *PostRepo) CountPublished(ctx context.Context, filter port.PostFilter) (int64, error) {
 	list, err := r.ListPublished(ctx, filter)
 	if err != nil {
@@ -349,6 +364,7 @@ func (r *PostRepo) CountPublished(ctx context.Context, filter port.PostFilter) (
 	return int64(len(list)), nil
 }
 
+// ListAll returns every post.
 func (r *PostRepo) ListAll(ctx context.Context) ([]domain.BlogPost, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -359,6 +375,7 @@ func (r *PostRepo) ListAll(ctx context.Context) ([]domain.BlogPost, error) {
 	return list, nil
 }
 
+// GetPublishedBySlug returns one published post by slug, or ErrNotFound.
 func (r *PostRepo) GetPublishedBySlug(ctx context.Context, slug string) (*domain.BlogPost, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -371,6 +388,7 @@ func (r *PostRepo) GetPublishedBySlug(ctx context.Context, slug string) (*domain
 	return nil, domain.ErrNotFound
 }
 
+// GetByID returns the post with the given id, or ErrNotFound.
 func (r *PostRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.BlogPost, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -381,6 +399,7 @@ func (r *PostRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.BlogPost,
 	return &p, nil
 }
 
+// Create stores a new post.
 func (r *PostRepo) Create(ctx context.Context, p *domain.BlogPost) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -388,6 +407,7 @@ func (r *PostRepo) Create(ctx context.Context, p *domain.BlogPost) error {
 	return nil
 }
 
+// Update replaces an existing post, or returns ErrNotFound.
 func (r *PostRepo) Update(ctx context.Context, p *domain.BlogPost) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -398,6 +418,7 @@ func (r *PostRepo) Update(ctx context.Context, p *domain.BlogPost) error {
 	return nil
 }
 
+// Delete removes the post with the given id, or returns ErrNotFound.
 func (r *PostRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -408,6 +429,7 @@ func (r *PostRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+// IncrementViewCount bumps the post's view counter.
 func (r *PostRepo) IncrementViewCount(ctx context.Context, id uuid.UUID) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -420,6 +442,7 @@ func (r *PostRepo) IncrementViewCount(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+// SumViews returns the total view counter across all posts.
 func (r *PostRepo) SumViews(ctx context.Context) (int64, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -436,6 +459,7 @@ type TagRepo struct {
 	data map[string]domain.Tag
 }
 
+// List returns all tags ordered by name.
 func (r *TagRepo) List(ctx context.Context) ([]domain.Tag, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -446,6 +470,7 @@ func (r *TagRepo) List(ctx context.Context) ([]domain.Tag, error) {
 	return list, nil
 }
 
+// GetOrCreate returns the tag with the given slug, creating it if missing.
 func (r *TagRepo) GetOrCreate(ctx context.Context, name, slug string) (*domain.Tag, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -467,6 +492,7 @@ type AssetRepo struct {
 	data map[string]domain.Asset
 }
 
+// Create stores a new asset row.
 func (r *AssetRepo) Create(ctx context.Context, a *domain.Asset) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -474,6 +500,7 @@ func (r *AssetRepo) Create(ctx context.Context, a *domain.Asset) error {
 	return nil
 }
 
+// GetByKey returns the asset with the given object key, or ErrNotFound.
 func (r *AssetRepo) GetByKey(ctx context.Context, key string) (*domain.Asset, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -484,6 +511,7 @@ func (r *AssetRepo) GetByKey(ctx context.Context, key string) (*domain.Asset, er
 	return &a, nil
 }
 
+// DeleteByKey removes the asset row with the given object key, or returns ErrNotFound.
 func (r *AssetRepo) DeleteByKey(ctx context.Context, key string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -500,6 +528,7 @@ type ProfileRepo struct {
 	profile *domain.Profile
 }
 
+// Get returns the singleton profile, or ErrNotFound.
 func (r *ProfileRepo) Get(ctx context.Context) (*domain.Profile, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -510,6 +539,7 @@ func (r *ProfileRepo) Get(ctx context.Context) (*domain.Profile, error) {
 	return &p, nil
 }
 
+// Upsert creates or replaces the singleton profile.
 func (r *ProfileRepo) Upsert(ctx context.Context, p *domain.Profile) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -523,6 +553,7 @@ type AnalyticsStore struct {
 	views []port.PostView
 }
 
+// RecordPostView records one view event.
 func (s *AnalyticsStore) RecordPostView(ctx context.Context, view port.PostView) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -530,12 +561,14 @@ func (s *AnalyticsStore) RecordPostView(ctx context.Context, view port.PostView)
 	return nil
 }
 
+// TotalViews returns the total number of view events.
 func (s *AnalyticsStore) TotalViews(ctx context.Context) (int64, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return int64(len(s.views)), nil
 }
 
+// ViewsTimeSeries returns cumulative view counts per bucket over [from, to].
 func (s *AnalyticsStore) ViewsTimeSeries(ctx context.Context, from, to time.Time, bucket string) ([]port.ViewsBucket, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -554,6 +587,7 @@ func (s *AnalyticsStore) ViewsTimeSeries(ctx context.Context, from, to time.Time
 	return res, nil
 }
 
+// TopPosts returns the most-viewed posts, capped at the given limit.
 func (s *AnalyticsStore) TopPosts(ctx context.Context, limit int) ([]port.TopPost, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -591,6 +625,7 @@ type StatsRepo struct {
 	analytics   *AnalyticsStore
 }
 
+// Summary returns operational counts.
 func (r *StatsRepo) Summary(ctx context.Context) (port.StatsSummary, error) {
 	expList, _ := r.expRepo.List(ctx)
 	projList, _ := r.projectRepo.ListPublished(ctx, port.ProjectFilter{})
@@ -618,6 +653,7 @@ type AssetStore struct {
 	files map[string][]byte
 }
 
+// Upload stores an object and returns its canonical URL.
 func (s *AssetStore) Upload(ctx context.Context, key string, r io.Reader, contentType string, size int64) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -629,6 +665,7 @@ func (s *AssetStore) Upload(ctx context.Context, key string, r io.Reader, conten
 	return fmt.Sprintf("https://mock-objectstorage.oraclecloud.com/%s", key), nil
 }
 
+// Presign returns a short-lived pre-authenticated request URL.
 func (s *AssetStore) Presign(ctx context.Context, key string) (string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -640,6 +677,7 @@ func (s *AssetStore) Presign(ctx context.Context, key string) (string, error) {
 	return fmt.Sprintf("https://mock-objectstorage.oraclecloud.com/signed/%s", key), nil
 }
 
+// Delete removes an object from the bucket.
 func (s *AssetStore) Delete(ctx context.Context, key string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
