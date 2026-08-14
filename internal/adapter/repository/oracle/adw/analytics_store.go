@@ -83,7 +83,7 @@ func (s *AnalyticsStore) ViewsTimeSeries(ctx context.Context, from, to time.Time
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var buckets []port.ViewsBucket
 	var cumulative int64
@@ -111,7 +111,7 @@ func (s *AnalyticsStore) TopPosts(ctx context.Context, limit int) ([]port.TopPos
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []port.TopPost
 	for rows.Next() {
