@@ -76,13 +76,13 @@ func main() {
 		if err != nil {
 			logger.Fatalf("failed to connect to ATP database: %v", err)
 		}
-		defer atpDB.Close()
+		defer func() { _ = atpDB.Close() }()
 
 		adwDB, err := platform.NewOracleDB(ctx, cfg.ADWDSN)
 		if err != nil {
 			logger.Fatalf("failed to connect to ADW database: %v", err)
 		}
-		defer adwDB.Close()
+		defer func() { _ = adwDB.Close() }()
 
 		expRepo = atp.NewExperienceRepo(atpDB)
 		projectRepo = atp.NewProjectRepo(atpDB)
