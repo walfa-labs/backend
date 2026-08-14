@@ -29,6 +29,7 @@ type AssetStore struct {
 // PEM file at privateKeyPath must be an unencrypted private key. When
 // namespace is empty it is resolved via the GetNamespace API (fail fast).
 func NewAssetStore(tenancyOCID, userOCID, fingerprint, region, privateKeyPath, namespace, bucket string) (*AssetStore, error) {
+	// #nosec G304 -- privateKeyPath comes from server configuration (env), not user input.
 	keyBytes, err := os.ReadFile(privateKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("oci objectstorage: read private key: %w", err)
@@ -99,10 +100,10 @@ func (s *AssetStore) Presign(ctx context.Context, key string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("oci objectstorage: presign %q: %w", key, err)
 	}
-	if resp.PreauthenticatedRequest.AccessUri == nil {
+	if resp.AccessUri == nil {
 		return "", fmt.Errorf("oci objectstorage: presign %q: empty access URI", key)
 	}
-	return s.endpointURL() + *resp.PreauthenticatedRequest.AccessUri, nil
+	return s.endpointURL() + *resp.AccessUri, nil
 }
 
 // Delete removes an object from the bucket.
