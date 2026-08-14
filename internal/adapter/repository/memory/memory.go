@@ -113,8 +113,14 @@ func NewStore(adminPasswordHash string) *Store {
 
 	adminRepo := &AdminRepo{user: adminUser}
 	expRepo := &ExperienceRepo{data: map[uuid.UUID]domain.Experience{demoExp.ID: demoExp}}
-	projectRepo := &ProjectRepo{data: map[uuid.UUID]domain.Project{demoProject.ID: demoProject}}
-	postRepo := &PostRepo{data: map[uuid.UUID]domain.BlogPost{demoPost.ID: demoPost}}
+	projectRepo := &ProjectRepo{
+		data:    map[uuid.UUID]domain.Project{demoProject.ID: demoProject},
+		slugMap: map[string]uuid.UUID{demoProject.Slug: demoProject.ID},
+	}
+	postRepo := &PostRepo{
+		data:    map[uuid.UUID]domain.BlogPost{demoPost.ID: demoPost},
+		slugMap: map[string]uuid.UUID{demoPost.Slug: demoPost.ID},
+	}
 	tagRepo := &TagRepo{data: map[string]domain.Tag{tagGo.Slug: tagGo, tagFiber.Slug: tagFiber, tagOracle.Slug: tagOracle}}
 	assetRepo := &AssetRepo{data: make(map[string]domain.Asset)}
 	profileRepo := &ProfileRepo{profile: demoProfile}
@@ -225,8 +231,9 @@ func (r *ExperienceRepo) Delete(ctx context.Context, id uuid.UUID) error {
 
 // ProjectRepo in-memory
 type ProjectRepo struct {
-	mu   sync.RWMutex
-	data map[uuid.UUID]domain.Project
+	mu      sync.RWMutex
+	data    map[uuid.UUID]domain.Project
+	slugMap map[string]uuid.UUID
 }
 
 // ListPublished returns published projects, optionally filtered to featured.
@@ -266,6 +273,15 @@ func (r *ProjectRepo) ListAll(ctx context.Context) ([]domain.Project, error) {
 func (r *ProjectRepo) GetBySlug(ctx context.Context, slug string) (*domain.Project, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+	if r.slugMap != nil {
+		if id, ok := r.slugMap[slug]; ok {
+			if p, ok := r.data[id]; ok && p.Status == domain.StatusPublished {
+				cp := p
+				return &cp, nil
+			}
+		}
+		return nil, domain.ErrNotFound
+	}
 	for _, p := range r.data {
 		if p.Slug == slug && p.Status == domain.StatusPublished {
 			cp := p
@@ -290,7 +306,11 @@ func (r *ProjectRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Projec
 func (r *ProjectRepo) Create(ctx context.Context, p *domain.Project) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.slugMap == nil {
+		r.slugMap = make(map[string]uuid.UUID)
+	}
 	r.data[p.ID] = *p
+	r.slugMap[p.Slug] = p.ID
 	return nil
 }
 
@@ -298,10 +318,18 @@ func (r *ProjectRepo) Create(ctx context.Context, p *domain.Project) error {
 func (r *ProjectRepo) Update(ctx context.Context, p *domain.Project) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, ok := r.data[p.ID]; !ok {
+	old, ok := r.data[p.ID]
+	if !ok {
 		return domain.ErrNotFound
 	}
+	if r.slugMap == nil {
+		r.slugMap = make(map[string]uuid.UUID)
+	}
+	if old.Slug != p.Slug {
+		delete(r.slugMap, old.Slug)
+	}
 	r.data[p.ID] = *p
+	r.slugMap[p.Slug] = p.ID
 	return nil
 }
 
@@ -309,8 +337,12 @@ func (r *ProjectRepo) Update(ctx context.Context, p *domain.Project) error {
 func (r *ProjectRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, ok := r.data[id]; !ok {
+	old, ok := r.data[id]
+	if !ok {
 		return domain.ErrNotFound
+	}
+	if r.slugMap != nil {
+		delete(r.slugMap, old.Slug)
 	}
 	delete(r.data, id)
 	return nil
@@ -318,8 +350,9 @@ func (r *ProjectRepo) Delete(ctx context.Context, id uuid.UUID) error {
 
 // PostRepo in-memory
 type PostRepo struct {
-	mu   sync.RWMutex
-	data map[uuid.UUID]domain.BlogPost
+	mu      sync.RWMutex
+	data    map[uuid.UUID]domain.BlogPost
+	slugMap map[string]uuid.UUID
 }
 
 // ListPublished returns published post summaries for a page.
@@ -352,16 +385,63 @@ func (r *PostRepo) ListPublished(ctx context.Context, filter port.PostFilter) ([
 			})
 		}
 	}
-	return list, nil
+
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].PublishedAt == nil {
+			return false
+		}
+		if list[j].PublishedAt == nil {
+			return true
+		}
+		return list[i].PublishedAt.After(*list[j].PublishedAt)
+	})
+
+	if filter.Page <= 0 && filter.PerPage <= 0 {
+		return list, nil
+	}
+
+	page := filter.Page
+	if page < 1 {
+		page = 1
+	}
+	perPage := filter.PerPage
+	if perPage < 1 {
+		perPage = 10
+	}
+	start := (page - 1) * perPage
+	if start >= len(list) {
+		return []port.PostSummary{}, nil
+	}
+	end := start + perPage
+	if end > len(list) {
+		end = len(list)
+	}
+	return list[start:end], nil
 }
 
 // CountPublished returns the total number of published posts.
 func (r *PostRepo) CountPublished(ctx context.Context, filter port.PostFilter) (int64, error) {
-	list, err := r.ListPublished(ctx, filter)
-	if err != nil {
-		return 0, err
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var count int64
+	for _, p := range r.data {
+		if p.Status == domain.StatusPublished {
+			if filter.Tag != "" {
+				matched := false
+				for _, t := range p.Tags {
+					if t.Slug == filter.Tag {
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					continue
+				}
+			}
+			count++
+		}
 	}
-	return int64(len(list)), nil
+	return count, nil
 }
 
 // ListAll returns every post.
@@ -372,6 +452,9 @@ func (r *PostRepo) ListAll(ctx context.Context) ([]domain.BlogPost, error) {
 	for _, p := range r.data {
 		list = append(list, p)
 	}
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].CreatedAt.After(list[j].CreatedAt)
+	})
 	return list, nil
 }
 
@@ -379,6 +462,15 @@ func (r *PostRepo) ListAll(ctx context.Context) ([]domain.BlogPost, error) {
 func (r *PostRepo) GetPublishedBySlug(ctx context.Context, slug string) (*domain.BlogPost, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+	if r.slugMap != nil {
+		if id, ok := r.slugMap[slug]; ok {
+			if p, ok := r.data[id]; ok && p.Status == domain.StatusPublished {
+				cp := p
+				return &cp, nil
+			}
+		}
+		return nil, domain.ErrNotFound
+	}
 	for _, p := range r.data {
 		if p.Slug == slug && p.Status == domain.StatusPublished {
 			cp := p
@@ -403,7 +495,11 @@ func (r *PostRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.BlogPost,
 func (r *PostRepo) Create(ctx context.Context, p *domain.BlogPost) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.slugMap == nil {
+		r.slugMap = make(map[string]uuid.UUID)
+	}
 	r.data[p.ID] = *p
+	r.slugMap[p.Slug] = p.ID
 	return nil
 }
 
@@ -411,10 +507,18 @@ func (r *PostRepo) Create(ctx context.Context, p *domain.BlogPost) error {
 func (r *PostRepo) Update(ctx context.Context, p *domain.BlogPost) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, ok := r.data[p.ID]; !ok {
+	old, ok := r.data[p.ID]
+	if !ok {
 		return domain.ErrNotFound
 	}
+	if r.slugMap == nil {
+		r.slugMap = make(map[string]uuid.UUID)
+	}
+	if old.Slug != p.Slug {
+		delete(r.slugMap, old.Slug)
+	}
 	r.data[p.ID] = *p
+	r.slugMap[p.Slug] = p.ID
 	return nil
 }
 
@@ -422,8 +526,12 @@ func (r *PostRepo) Update(ctx context.Context, p *domain.BlogPost) error {
 func (r *PostRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, ok := r.data[id]; !ok {
+	old, ok := r.data[id]
+	if !ok {
 		return domain.ErrNotFound
+	}
+	if r.slugMap != nil {
+		delete(r.slugMap, old.Slug)
 	}
 	delete(r.data, id)
 	return nil

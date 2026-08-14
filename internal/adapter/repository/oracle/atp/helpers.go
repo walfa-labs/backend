@@ -20,11 +20,28 @@ package atp
 
 import (
 	"database/sql"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/godror/godror"
 )
+
+// inPlaceholders returns positional placeholders ":1, :2, :3" for count elements starting at start.
+func inPlaceholders(count, start int) string {
+	if count <= 0 {
+		return ""
+	}
+	var b strings.Builder
+	for i := 0; i < count; i++ {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(":")
+		b.WriteString(strconv.Itoa(start + i))
+	}
+	return b.String()
+}
 
 // rowScanner is satisfied by *sql.Row and *sql.Rows.
 type rowScanner interface {

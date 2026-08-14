@@ -93,18 +93,34 @@ func (r *ProjectRepo) ListPublished(ctx context.Context, filter port.ProjectFilt
 	defer func() { _ = rows.Close() }()
 
 	var out []domain.Project
+	var ids []uuid.UUID
 	for rows.Next() {
 		p, err := scanProject(rows)
 		if err != nil {
 			return nil, err
 		}
-		p.Links, err = r.fetchLinks(ctx, p.ID)
-		if err != nil {
-			return nil, err
-		}
 		out = append(out, *p)
+		ids = append(ids, p.ID)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return out, nil
+	}
+
+	linksMap, err := r.fetchLinksForProjects(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for i := range out {
+		if links, ok := linksMap[out[i].ID]; ok {
+			out[i].Links = links
+		} else {
+			out[i].Links = []domain.ProjectLink{}
+		}
+	}
+	return out, nil
 }
 
 // ListAll returns all projects including drafts, ordered by sort_order.
@@ -116,18 +132,34 @@ func (r *ProjectRepo) ListAll(ctx context.Context) ([]domain.Project, error) {
 	defer func() { _ = rows.Close() }()
 
 	var out []domain.Project
+	var ids []uuid.UUID
 	for rows.Next() {
 		p, err := scanProject(rows)
 		if err != nil {
 			return nil, err
 		}
-		p.Links, err = r.fetchLinks(ctx, p.ID)
-		if err != nil {
-			return nil, err
-		}
 		out = append(out, *p)
+		ids = append(ids, p.ID)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return out, nil
+	}
+
+	linksMap, err := r.fetchLinksForProjects(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for i := range out {
+		if links, ok := linksMap[out[i].ID]; ok {
+			out[i].Links = links
+		} else {
+			out[i].Links = []domain.ProjectLink{}
+		}
+	}
+	return out, nil
 }
 
 // GetBySlug returns a single project with its links.
@@ -255,29 +287,57 @@ func (r *ProjectRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (r *ProjectRepo) fetchLinks(ctx context.Context, projectID uuid.UUID) ([]domain.ProjectLink, error) {
-	rows, err := r.db.QueryContext(ctx, `
+func (r *ProjectRepo) fetchLinksForProjects(ctx context.Context, projectIDs []uuid.UUID) (map[uuid.UUID][]domain.ProjectLink, error) {
+	result := make(map[uuid.UUID][]domain.ProjectLink, len(projectIDs))
+	if len(projectIDs) == 0 {
+		return result, nil
+	}
+
+	args := make([]any, len(projectIDs))
+	for i, id := range projectIDs {
+		args[i] = id.String()
+		result[id] = []domain.ProjectLink{}
+	}
+
+	q := `
 		SELECT project_link_id, project_id, label, url, kind
 		FROM project_links
-		WHERE project_id = $1
-		ORDER BY project_link_id ASC`, projectID.String())
+		WHERE project_id IN (` + inPlaceholders(len(projectIDs), 1) + `)
+		ORDER BY project_link_id ASC`
+
+	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 
-	var out []domain.ProjectLink
 	for rows.Next() {
 		var l domain.ProjectLink
+		var projIDStr string
 		var label, url sql.NullString
-		if err := rows.Scan(&l.ID, &l.ProjectID, &label, &url, &l.Kind); err != nil {
+		if err := rows.Scan(&l.ID, &projIDStr, &label, &url, &l.Kind); err != nil {
 			return nil, err
 		}
 		l.Label = nullStr(label)
 		l.URL = nullStr(url)
-		out = append(out, l)
+		projID, err := uuid.Parse(projIDStr)
+		if err == nil {
+			l.ProjectID = projID
+			result[projID] = append(result[projID], l)
+		}
 	}
-	return out, rows.Err()
+	return result, rows.Err()
+}
+
+func (r *ProjectRepo) fetchLinks(ctx context.Context, projectID uuid.UUID) ([]domain.ProjectLink, error) {
+	m, err := r.fetchLinksForProjects(ctx, []uuid.UUID{projectID})
+	if err != nil {
+		return nil, err
+	}
+	if links, ok := m[projectID]; ok {
+		return links, nil
+	}
+	return []domain.ProjectLink{}, nil
 }
 
 func (r *ProjectRepo) replaceLinks(ctx context.Context, tx *sql.Tx, projectID uuid.UUID, links []domain.ProjectLink) error {

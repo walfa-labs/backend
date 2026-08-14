@@ -86,6 +86,7 @@ func (r *PostRepo) ListPublished(ctx context.Context, filter port.PostFilter) ([
 
 func (r *PostRepo) scanSummaries(ctx context.Context, rows *sql.Rows) ([]port.PostSummary, error) {
 	var out []port.PostSummary
+	var ids []uuid.UUID
 	for rows.Next() {
 		var s port.PostSummary
 		var excerpt, coverURL sql.NullString
@@ -97,42 +98,77 @@ func (r *PostRepo) scanSummaries(ctx context.Context, rows *sql.Rows) ([]port.Po
 		s.CoverImageURL = nullStr(coverURL)
 		s.PublishedAt = nullTime(publishedAt)
 		out = append(out, s)
+		ids = append(ids, s.ID)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	if len(out) == 0 {
+		return out, nil
+	}
 
+	tagsMap, err := r.fetchTagsForPosts(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 	for i := range out {
-		tags, err := r.fetchTags(ctx, out[i].ID)
-		if err != nil {
-			return nil, err
+		if tags, ok := tagsMap[out[i].ID]; ok {
+			out[i].Tags = tags
+		} else {
+			out[i].Tags = []domain.Tag{}
 		}
-		out[i].Tags = tags
 	}
 	return out, nil
 }
 
-func (r *PostRepo) fetchTags(ctx context.Context, postID uuid.UUID) ([]domain.Tag, error) {
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT t.tag_id, t.name, t.slug
+func (r *PostRepo) fetchTagsForPosts(ctx context.Context, postIDs []uuid.UUID) (map[uuid.UUID][]domain.Tag, error) {
+	result := make(map[uuid.UUID][]domain.Tag, len(postIDs))
+	if len(postIDs) == 0 {
+		return result, nil
+	}
+
+	args := make([]any, len(postIDs))
+	for i, id := range postIDs {
+		args[i] = id.String()
+		result[id] = []domain.Tag{}
+	}
+
+	q := `
+		SELECT pt.blog_post_id, t.tag_id, t.name, t.slug
 		FROM tags t
 		JOIN post_tags pt ON pt.tag_id = t.tag_id
-		WHERE pt.blog_post_id = :1
-		ORDER BY t.name ASC`, postID.String())
+		WHERE pt.blog_post_id IN (` + inPlaceholders(len(postIDs), 1) + `)
+		ORDER BY t.name ASC`
+
+	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 
-	var out []domain.Tag
 	for rows.Next() {
+		var postIDStr string
 		var t domain.Tag
-		if err := rows.Scan(&t.ID, &t.Name, &t.Slug); err != nil {
+		if err := rows.Scan(&postIDStr, &t.ID, &t.Name, &t.Slug); err != nil {
 			return nil, err
 		}
-		out = append(out, t)
+		postID, err := uuid.Parse(postIDStr)
+		if err == nil {
+			result[postID] = append(result[postID], t)
+		}
 	}
-	return out, rows.Err()
+	return result, rows.Err()
+}
+
+func (r *PostRepo) fetchTags(ctx context.Context, postID uuid.UUID) ([]domain.Tag, error) {
+	tagsMap, err := r.fetchTagsForPosts(ctx, []uuid.UUID{postID})
+	if err != nil {
+		return nil, err
+	}
+	if tags, ok := tagsMap[postID]; ok {
+		return tags, nil
+	}
+	return []domain.Tag{}, nil
 }
 
 // ListAll returns all posts including drafts, ordered by created_at desc.
@@ -144,18 +180,34 @@ func (r *PostRepo) ListAll(ctx context.Context) ([]domain.BlogPost, error) {
 	defer func() { _ = rows.Close() }()
 
 	var out []domain.BlogPost
+	var ids []uuid.UUID
 	for rows.Next() {
 		p, err := scanPost(rows)
 		if err != nil {
 			return nil, err
 		}
-		p.Tags, err = r.fetchTags(ctx, p.ID)
-		if err != nil {
-			return nil, err
-		}
 		out = append(out, *p)
+		ids = append(ids, p.ID)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return out, nil
+	}
+
+	tagsMap, err := r.fetchTagsForPosts(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for i := range out {
+		if tags, ok := tagsMap[out[i].ID]; ok {
+			out[i].Tags = tags
+		} else {
+			out[i].Tags = []domain.Tag{}
+		}
+	}
+	return out, nil
 }
 
 // GetPublishedBySlug returns a published post with its tags.

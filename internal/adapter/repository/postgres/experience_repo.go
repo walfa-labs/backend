@@ -53,14 +53,34 @@ func (r *ExperienceRepo) List(ctx context.Context) ([]domain.Experience, error) 
 	defer func() { _ = rows.Close() }()
 
 	var out []domain.Experience
+	var ids []uuid.UUID
 	for rows.Next() {
 		e, err := scanExperience(rows)
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, *e)
+		ids = append(ids, e.ID)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return out, nil
+	}
+
+	hlMap, err := r.fetchHighlightsForExperiences(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for i := range out {
+		if hl, ok := hlMap[out[i].ID]; ok {
+			out[i].Highlights = hl
+		} else {
+			out[i].Highlights = []domain.ExperienceHighlight{}
+		}
+	}
+	return out, nil
 }
 
 // GetByID returns a single experience with its highlights.
@@ -163,26 +183,54 @@ func (r *ExperienceRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (r *ExperienceRepo) fetchHighlights(ctx context.Context, experienceID uuid.UUID) ([]domain.ExperienceHighlight, error) {
-	rows, err := r.db.QueryContext(ctx, `
+func (r *ExperienceRepo) fetchHighlightsForExperiences(ctx context.Context, expIDs []uuid.UUID) (map[uuid.UUID][]domain.ExperienceHighlight, error) {
+	result := make(map[uuid.UUID][]domain.ExperienceHighlight, len(expIDs))
+	if len(expIDs) == 0 {
+		return result, nil
+	}
+
+	args := make([]any, len(expIDs))
+	for i, id := range expIDs {
+		args[i] = id.String()
+		result[id] = []domain.ExperienceHighlight{}
+	}
+
+	q := `
 		SELECT experience_highlight_id, experience_id, body_markdown, sort_order
 		FROM experience_highlights
-		WHERE experience_id = $1
-		ORDER BY sort_order ASC`, experienceID.String())
+		WHERE experience_id IN (` + inPlaceholders(len(expIDs), 1) + `)
+		ORDER BY sort_order ASC`
+
+	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 
-	var out []domain.ExperienceHighlight
 	for rows.Next() {
 		var h domain.ExperienceHighlight
-		if err := rows.Scan(&h.ID, &h.ExperienceID, &h.BodyMarkdown, &h.SortOrder); err != nil {
+		var expIDStr string
+		if err := rows.Scan(&h.ID, &expIDStr, &h.BodyMarkdown, &h.SortOrder); err != nil {
 			return nil, err
 		}
-		out = append(out, h)
+		expID, err := uuid.Parse(expIDStr)
+		if err == nil {
+			h.ExperienceID = expID
+			result[expID] = append(result[expID], h)
+		}
 	}
-	return out, rows.Err()
+	return result, rows.Err()
+}
+
+func (r *ExperienceRepo) fetchHighlights(ctx context.Context, experienceID uuid.UUID) ([]domain.ExperienceHighlight, error) {
+	m, err := r.fetchHighlightsForExperiences(ctx, []uuid.UUID{experienceID})
+	if err != nil {
+		return nil, err
+	}
+	if highlights, ok := m[experienceID]; ok {
+		return highlights, nil
+	}
+	return []domain.ExperienceHighlight{}, nil
 }
 
 func (r *ExperienceRepo) replaceHighlights(ctx context.Context, tx *sql.Tx, experienceID uuid.UUID, highlights []domain.ExperienceHighlight) error {
