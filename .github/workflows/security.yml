@@ -78,18 +78,18 @@ jobs:
   sast-semgrep:
     name: SAST - Semgrep Security Analysis
     runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:1.173.0
     permissions:
       contents: read
       security-events: write
-    container:
-      image: semgrep/semgrep:latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Run Semgrep Rules
+      - name: Run Semgrep OSS Scan
         run: |
-          semgrep scan --config auto --sarif --output semgrep.sarif || true
+          semgrep scan --config auto --sarif --output semgrep.sarif
 
       - name: Upload Semgrep SARIF Report
         uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
