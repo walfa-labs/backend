@@ -32,7 +32,7 @@ func (h *AssetHandler) Upload(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	asset, err := h.svc.Upload(c.Context(), f, file.Header.Get("Content-Type"), file.Size)
 	if err != nil {
