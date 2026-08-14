@@ -29,7 +29,7 @@ func NewAssetStore(baseDir, baseURL string) (*AssetStore, error) {
 	}
 	baseURL = strings.TrimSuffix(baseURL, "/")
 
-	if err := os.MkdirAll(baseDir, 0750); err != nil {
+	if err := os.MkdirAll(baseDir, 0o750); err != nil {
 		return nil, fmt.Errorf("local asset store: create base dir: %w", err)
 	}
 
@@ -58,7 +58,7 @@ func (s *AssetStore) Upload(ctx context.Context, key string, r io.Reader, conten
 	}
 
 	// Ensure subdirectories exist
-	if err := os.MkdirAll(filepath.Dir(absTarget), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Dir(absTarget), 0o750); err != nil {
 		return "", fmt.Errorf("local asset store: create dirs for %q: %w", key, err)
 	}
 
