@@ -195,6 +195,7 @@ func (r *ExperienceRepo) fetchHighlightsForExperiences(ctx context.Context, expI
 		result[id] = []domain.ExperienceHighlight{}
 	}
 
+	// #nosec G202 -- SQL query uses parameterized positional placeholders
 	q := `
 		SELECT experience_highlight_id, experience_id, body_markdown, sort_order
 		FROM experience_highlights

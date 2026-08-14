@@ -64,7 +64,8 @@ services:
         condition: service_healthy
     volumes:
       - ./docs:/zap/wrk/:rw
-    command: zap-api-scan.py -t /zap/wrk/openapi.yaml -f openapi -u http://backend:8080 -r dast-report.html
+      - ./.zap:/zap/config/:ro
+    command: zap-api-scan.py -t /zap/wrk/openapi.yaml -f openapi -u http://backend:8080 -r dast-report.html -c /zap/config/rules.tsv
 
 volumes:
   oracle-data:

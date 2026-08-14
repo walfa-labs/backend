@@ -1,0 +1,11 @@
+# OWASP ZAP Alert Filter Rules for Portfolio API
+# Format: <rule-id>\t<IGNORE|INFO|WARN|FAIL>\t<comment>
+
+# Rule 100000: A Client Error response code was returned by the server (4xx responses on unauthenticated/invalid requests are expected)
+100000	IGNORE	(A Client Error response code was returned by the server)
+
+# Rule 10111: Authentication Request Identified (identifies /api/v1/auth/login as an authentication endpoint)
+10111	IGNORE	(Authentication Request Identified)
+
+# Rule 10049: Content Cacheability / Non-Storable Content / Storable and Cacheable Content (informational cache headers)
+10049	IGNORE	(Content Cacheability)

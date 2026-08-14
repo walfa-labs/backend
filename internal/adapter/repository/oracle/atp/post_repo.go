@@ -133,6 +133,7 @@ func (r *PostRepo) fetchTagsForPosts(ctx context.Context, postIDs []uuid.UUID) (
 		result[id] = []domain.Tag{}
 	}
 
+	// #nosec G202 -- SQL query uses parameterized positional placeholders
 	q := `
 		SELECT pt.blog_post_id, t.tag_id, t.name, t.slug
 		FROM tags t

@@ -299,6 +299,7 @@ func (r *ProjectRepo) fetchLinksForProjects(ctx context.Context, projectIDs []uu
 		result[id] = []domain.ProjectLink{}
 	}
 
+	// #nosec G202 -- SQL query uses parameterized positional placeholders
 	q := `
 		SELECT project_link_id, project_id, label, url, kind
 		FROM project_links
