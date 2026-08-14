@@ -1,21 +1,24 @@
-# Portfolio Backend API
+# Walfa Labs - Backend API
 
-[![Go Version](https://img.shields.io/badge/Go-1.26.6-00ADD8?style=flat&logo=go)](https://go.dev)
-[![Fiber Framework](https://img.shields.io/badge/Fiber-v3.4.0-00ACD7?style=flat&logo=go)](https://gofiber.io)
-[![Database](https://img.shields.io/badge/Oracle-ATP%20%2B%20ADW%20%2B%2023ai-F80000?style=flat&logo=oracle)](https://www.oracle.com/cloud/database/)
-[![Security](https://img.shields.io/badge/DevSecOps-SAST%20%7C%20DAST%20%7C%20SCA-brightgreen?style=flat&logo=securityscorecard)](https://github.com/walfa-labs/backend/actions)
-[![License: WTFPL](https://img.shields.io/badge/License-WTFPL-brightgreen.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.26.6-00ADD8?style=flat&logo=go&logoColor=white)](https://go.dev)
+[![Fiber Framework](https://img.shields.io/badge/Fiber-v3.4.0-00ACD7?style=flat&logo=go&logoColor=white)](https://gofiber.io)
+[![Database](https://img.shields.io/badge/Oracle-ATP%20%2B%20ADW%20%2B%2023ai-F80000?style=flat&logo=oracle&logoColor=white)](https://www.oracle.com/cloud/database/)
+[![Security](https://img.shields.io/badge/DevSecOps-SAST%20%7C%20DAST%20%7C%20SCA-brightgreen?style=flat&logo=securityscorecard&logoColor=white)](https://github.com/walfa-labs/backend/actions)
+[![Docker](https://img.shields.io/badge/Docker-Production_Ready-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
+[![License: WTFPL](https://img.shields.io/badge/License-WTFPL-brightgreen.svg?style=flat)](LICENSE)
 
 A high-performance, enterprise-grade REST API backend for developer portfolios and dynamic content management. Built in Go with the **Fiber v3** framework (fasthttp core), **Sonic JSON** SIMD/JIT parsing, and a clean **Hexagonal Architecture** (Ports & Adapters).
 
 Persistence is designed for **polyglot Oracle Cloud** environments (OCI Always Free tier) while providing seamless offline local development with **Oracle Free 23ai in Docker** and **local disk storage**.
 
+Connected to the [Walfa Labs Nuxt 4 Frontend](../frontend/README.md).
+
 ---
 
 ## Table of Contents
 
-- [Overview & Highlights](#overview--highlights)
 - [Architecture & Design](#architecture--design)
+- [Key Features](#key-features)
 - [Tech Stack](#tech-stack)
 - [Project Directory Structure](#project-directory-structure)
 - [Getting Started](#getting-started)
@@ -31,81 +34,83 @@ Persistence is designed for **polyglot Oracle Cloud** environments (OCI Always F
   - [System & Documentation](#system--documentation)
 - [Security & DevSecOps](#security--devsecops)
 - [Configuration Reference](#configuration-reference)
-- [Taskfile Commands (CLI Reference)](#taskfile-commands-cli-reference)
+- [Automation & Taskfile](#automation--taskfile)
 - [Testing & Quality Assurance](#testing--quality-assurance)
-
----
-
-## Overview & Highlights
-
-- **Blazing Fast Throughput**: Built on top of Fiber v3 (fasthttp) and ByteDance Sonic JIT/SIMD JSON encoder/decoder.
-- **Hexagonal Architecture (Ports & Adapters)**: Clear domain boundaries, dependency inversion, and swappable infrastructure adapters.
-- **Polyglot Oracle Persistence**:
-  - **OLTP**: Autonomous Transaction Processing (ATP) or Oracle Database 23ai Free for core operational domain models (experiences, projects, blog posts, tags, assets, singleton profile, admin auth).
-  - **OLAP / Analytics**: Autonomous Data Warehouse (ADW) or Oracle Database 23ai Free for star-schema analytics (`dim_posts`, `fact_post_views`), powering real-time time-series views and engagement ranking.
-  - **Dual Asset Storage**: Cloud-native OCI Object Storage with Pre-Authenticated Request (PAR) generation, or Local File System storage with static HTTP routing.
-- **Dual-Write View Tracking**: Non-blocking asynchronous dual-write pattern on public post reads (ATP view counter + ADW analytics fact records).
-- **Hardened Security**:
-  - JWT authentication (HS256) with short-lived access tokens (15m) and sliding refresh tokens (7d) via `httpOnly`, `Secure`, `SameSite=Strict` cookies.
-  - Rate-limited auth endpoints (5 requests/minute per client IP).
-  - Centralized security headers middleware (HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy).
-  - Full DevSecOps pipeline: Gitleaks, TruffleHog, Gosec SAST, Semgrep, Govulncheck SCA, Trivy (FS + Container), Zizmor workflow auditing, CodeQL, and OWASP ZAP DAST.
-- **Developer Experience**:
-  - Live OpenAPI 3 specification and interactive Swagger UI at `/swagger`.
-  - Structured logging with `gookit/slog` and automatic log file rotation.
-  - Standardized JSON success envelopes and RFC-style error envelopes with request correlation ID tracking (`X-Request-ID`).
-  - In-Memory Mock repository implementation for instant, dependency-free testing.
+- [Production Deployment](#production-deployment)
+- [License](#license)
 
 ---
 
 ## Architecture & Design
 
-The application follows the **Hexagonal / Clean Architecture** (Ports & Adapters) paradigm. Dependency flow points inward: `adapter` &rarr; `service` &rarr; `port` &rarr; `domain`. The `domain` package has zero internal or external framework dependencies.
+The application follows the **Hexagonal / Clean Architecture** (Ports & Adapters) paradigm. Dependency flow points strictly inward: `adapter` &rarr; `service` &rarr; `port` &rarr; `domain`. The core `domain` package maintains zero internal or external framework dependencies.
 
 ```
-                  +-------------------------------------------------------+
-                  |                     HTTP CLIENTS                      |
-                  +-------------------------------------------------------+
-                                              |
-                                              v
-                  +-------------------------------------------------------+
-                  |             Driving Adapter (Fiber v3)                |
-                  |   - Router, Middleware (Auth, CORS, Security, Log)    |
-                  |   - Request DTOs, Input Validation, Envelopes         |
-                  +-------------------------------------------------------+
-                                              |
-                                              v
-                  +-------------------------------------------------------+
-                  |               Application Services                    |
-                  |   - Experience, Project, Post, Auth, Asset, Profile   |
-                  |   - Business rules, State transitions, Dual-write     |
-                  +-------------------------------------------------------+
-                                              |
-                                              v
-                  +-------------------------------------------------------+
-                  |                     Port Layer                        |
-                  |   - Interfaces: *Repo, AnalyticsStore, AssetStore     |
-                  +-------------------------------------------------------+
-                                              |
-                        +---------------------+---------------------+
-                        |                                           |
-                        v                                           v
-+-----------------------------------------------+   +-------------------------------+
-|           Driven Adapters (Oracle / Local)     |   |         Domain Layer          |
-|  - ATP Repo (godror SQL - OLTP)               |   |  - Core Entities              |
-|  - ADW Analytics Store (godror SQL - OLAP)    |   |  - Sentinel Errors            |
-|  - OCI Object Storage / Local Storage Store   |   |  - Domain Enums               |
-|  - In-Memory Mock Store (for tests & DAST)    |   |  (Zero dependencies)          |
-+-----------------------------------------------+   +-------------------------------+
+                               ┌───────────────────────────────────────────────────────┐
+                               │                     HTTP CLIENTS                      │
+                               └──────────────────────────┬────────────────────────────┘
+                                                          │
+                                                          ▼
+                               ┌───────────────────────────────────────────────────────┐
+                               │              Driving Adapter (Fiber v3)               │
+                               │   • Router, Middleware (Auth, CORS, Security, Log)    │
+                               │   • Request DTOs, Input Validation, Envelopes         │
+                               └──────────────────────────┬────────────────────────────┘
+                                                          │
+                                                          ▼
+                               ┌───────────────────────────────────────────────────────┐
+                               │                 Application Services                  │
+                               │   • Experience, Project, Post, Auth, Asset, Profile   │
+                               │   • Business rules, State transitions, Dual-write     │
+                               └──────────────────────────┬────────────────────────────┘
+                                                          │
+                                                          ▼
+                               ┌───────────────────────────────────────────────────────┐
+                               │                      Port Layer                       │
+                               │   • Interfaces: *Repo, AnalyticsStore, AssetStore     │
+                               └──────────────────────────┬────────────────────────────┘
+                                                          │
+                                     ┌────────────────────┴────────────────────┐
+                                     │                                         │
+                                     ▼                                         ▼
+                 ┌───────────────────────────────────────┐ ┌───────────────────────────────────────┐
+                 │    Driven Adapters (Oracle / Local)   │ │             Domain Layer              │
+                 │ • ATP Repo (godror SQL - OLTP)        │ │ • Core Entities                       │
+                 │ • ADW Analytics Store (godror - OLAP) │ │ • Sentinel Errors                     │
+                 │ • OCI Object Storage / Local Storage  │ │ • Domain Enums                        │
+                 │ • In-Memory Mock Store (Tests & DAST) │ │ (Zero external dependencies)          │
+                 └───────────────────────────────────────┘ └───────────────────────────────────────┘
 ```
+
+---
+
+## Key Features
+
+- ⚡ **Blazing Fast Throughput**: Built on top of Fiber v3 (fasthttp) and ByteDance Sonic JIT/SIMD JSON encoder/decoder.
+- 🏛️ **Hexagonal Architecture**: Clear domain boundaries, dependency inversion, and fully swappable persistence adapters.
+- 💾 **Polyglot Oracle Persistence**:
+  - **OLTP**: Autonomous Transaction Processing (ATP) or Oracle Database 23ai Free for core operational domain models (experiences, projects, blog posts, tags, assets, singleton profile, admin auth).
+  - **OLAP / Analytics**: Autonomous Data Warehouse (ADW) or Oracle Database 23ai Free for star-schema analytics (`dim_posts`, `fact_post_views`), powering real-time time-series views and engagement ranking.
+  - **Dual Asset Storage**: Cloud-native OCI Object Storage with Pre-Authenticated Request (PAR) generation, or local filesystem storage with static HTTP routing.
+- 🔄 **Dual-Write View Tracking**: Non-blocking asynchronous dual-write pattern on public post reads (ATP view counter + ADW analytics fact records).
+- 🛡️ **Hardened DevSecOps**:
+  - JWT authentication (HS256) with short-lived access tokens (15m) and sliding refresh tokens (7d) via `httpOnly`, `Secure`, `SameSite=Strict` cookies.
+  - Rate-limited auth endpoints (5 requests/minute per client IP).
+  - Centralized security headers middleware (HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy).
+  - Full automated security suite: Gitleaks, TruffleHog, Gosec SAST, Semgrep, Govulncheck SCA, Trivy (FS + Container), Zizmor workflow auditing, CodeQL, and OWASP ZAP DAST.
+- 🛠️ **Developer Experience & Tooling**:
+  - Live OpenAPI 3 specification and interactive Swagger UI at `/swagger`.
+  - Structured logging with `gookit/slog` and automatic log file rotation.
+  - Standardized JSON success envelopes and RFC-style error envelopes with request correlation ID tracking (`X-Request-ID`).
+  - In-Memory Mock repository implementation for instant, zero-infra local development and testing.
 
 ---
 
 ## Tech Stack
 
-| Component | Technology / Library | Description |
+| Component | Technology | Description |
 |---|---|---|
-| **Language** | Go `1.26.6` | High-concurrency compiled backend language |
+| **Language** | [Go 1.26.6](https://go.dev) | High-concurrency compiled backend language |
 | **HTTP Engine** | [Fiber v3](https://github.com/gofiber/fiber/v3) (`v3.4.0`) | Express-inspired fasthttp web framework |
 | **JSON Codec** | [Sonic](https://github.com/bytedance/sonic) | SIMD/JIT accelerated JSON serializer/deserializer |
 | **Database Driver** | [godror](https://github.com/godror/godror) | Native Oracle Database driver via ODPI-C |
@@ -117,7 +122,7 @@ The application follows the **Hexagonal / Clean Architecture** (Ports & Adapters
 | **Validation** | [go-playground/validator/v10](https://github.com/go-playground/validator/v10) | Struct validation mapped via Fiber validator |
 | **Logging** | [gookit/slog](https://github.com/gookit/slog) + [rotatefile](https://github.com/gookit/rotatefile) | Structured console and rotating file logger |
 | **API Documentation** | [Swagger UI](https://github.com/gofiber/contrib/v3/swaggerui) | Interactive OpenAPI 3 explorer at `/swagger` |
-| **Task Runner** | [Task](https://taskfile.dev) | Modern task execution engine (`Taskfile.yml`) |
+| **Task Automation** | [Task](https://taskfile.dev) | Cross-platform task execution engine (`Taskfile.yml`) |
 
 ---
 
@@ -355,22 +360,16 @@ All admin routes require a valid Bearer token (`Authorization: Bearer <token>`).
 
 This repository integrates enterprise-grade DevSecOps security controls natively in CI/CD pipelines and local task runners:
 
-```
-+-----------------------------------------------------------------------------+
-|                          DevSecOps Scanning Matrix                          |
-+-------------------+----------------------+----------------------------------+
-| Security Domain   | Tooling              | Execution Phase                  |
-+-------------------+----------------------+----------------------------------+
-| Secret Detection  | Gitleaks, TruffleHog | Pre-commit & CI Pipeline         |
-| SAST (Go Code)    | Gosec, Semgrep       | CI Pipeline & Local Task         |
-| SAST (Deep)       | GitHub CodeQL        | Scheduled & CI Pipeline          |
-| SCA (Dependencies)| Govulncheck, Trivy   | CI Pipeline & Local Task         |
-| Workflow Audit    | Zizmor               | CI Security Scan                 |
-| Container Scan    | Trivy Container      | Docker Build Step                |
-| DAST (Dynamic)    | OWASP ZAP (OpenAPI)  | Pull Requests & Weekly Schedule  |
-| Supply Chain      | CycloneDX SBOM       | Tagged Releases to GHCR          |
-+-------------------+----------------------+----------------------------------+
-```
+| Security Domain | Tooling | Execution Phase | Description |
+|---|---|---|---|
+| **Secret Detection** | Gitleaks, TruffleHog | Pre-commit & CI Pipeline | Scans commits and history for leaked secrets & credentials |
+| **SAST (Go Code)** | Gosec, Semgrep | CI Pipeline & Local Task | Static AST analysis for Go security vulnerabilities & OWASP rules |
+| **SAST (Deep)** | GitHub CodeQL | Scheduled & CI Pipeline | Deep semantic query scanning for tainted inputs & injection flaws |
+| **SCA (Dependencies)** | Govulncheck, Trivy | CI Pipeline & Local Task | Audits Go modules & dependencies against known CVE databases |
+| **Workflow Audit** | Zizmor | CI Security Scan | Static analysis of GitHub Actions workflows for security misconfigurations |
+| **Container Scan** | Trivy Container | Docker Build Step | Scans base OS images and container packages for CVEs |
+| **DAST (Dynamic)** | OWASP ZAP (OpenAPI) | Pull Requests & Weekly Schedule | Dynamic security testing against live API using OpenAPI definitions |
+| **Supply Chain** | CycloneDX SBOM | Tagged Releases to GHCR | Generates Software Bill of Materials (SBOM) on release |
 
 Run all static security scans locally with:
 ```bash
@@ -410,9 +409,9 @@ All settings are read from environment variables via `internal/config`:
 
 ---
 
-## Taskfile Commands (CLI Reference)
+## Automation & Taskfile
 
-Run `task --list` to view all available commands:
+This repository includes a unified [`Taskfile.yml`](Taskfile.yml) for developer operations. Run `task --list` to view all commands:
 
 ### Development & Build
 ```bash
@@ -472,13 +471,31 @@ To run the entire test suite with race condition detection and coverage reportin
 task test:coverage
 ```
 
-### Test Structure
+### Test Suites
 - **Domain Tests** (`internal/domain`): Validates domain validation rules, errors, and entity behaviors.
 - **Service Unit Tests** (`internal/service`): Tests business logic, state transitions, and dual-write operations against mock repository ports.
 - **Repository Tests** (`internal/adapter/repository/memory`): Verifies CRUD operations and querying in the memory adapter.
 - **Handler Tests** (`internal/adapter/handler`): Validates request parsing, JSON deserialization, input validation, and HTTP status codes.
 - **Middleware Tests** (`internal/adapter/middleware`): Tests JWT auth verification, error handler envelopes, CORS headers, and security headers.
 - **Integration Tests** (`internal/router`): End-to-end HTTP request and response tests using Fiber's `app.Test()` engine.
+
+---
+
+## Production Deployment
+
+### Multi-Stage Container Build
+
+```bash
+# Build the production image
+docker build -t walfa-labs-backend:latest .
+
+# Run container with environment configuration
+docker run -d \
+  -p 8080:8080 \
+  --env-file .env \
+  --name walfa-labs-backend \
+  walfa-labs-backend:latest
+```
 
 ---
 
