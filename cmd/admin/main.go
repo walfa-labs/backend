@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -71,7 +72,9 @@ func generateRandomPassword(length int) (string, error) {
 }
 
 func updateEnvFile(filePath, username, password, hash string) error {
-	content, err := os.ReadFile(filePath)
+	cleanPath := filepath.Clean(filePath)
+	// #nosec G304 -- filePath is supplied via CLI flag by admin operator
+	content, err := os.ReadFile(cleanPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -121,11 +124,14 @@ func updateEnvFile(filePath, username, password, hash string) error {
 		output += "\n"
 	}
 
-	return os.WriteFile(filePath, []byte(output), 0o600)
+	// #nosec G703 -- CLI tool writing to admin specified .env file
+	return os.WriteFile(cleanPath, []byte(output), 0o600)
 }
 
 func loadDotEnv(filePath string) {
-	file, err := os.Open(filePath)
+	cleanPath := filepath.Clean(filePath)
+	// #nosec G304 -- filePath is supplied via CLI flag by admin operator
+	file, err := os.Open(cleanPath)
 	if err != nil {
 		return
 	}

@@ -91,4 +91,3 @@ func isUniqueViolation(err error) bool {
 	return strings.Contains(msg, "ora-00001") ||
 		strings.Contains(msg, "unique constraint")
 }
-

@@ -63,4 +63,3 @@ func isUniqueViolation(err error) bool {
 		strings.Contains(msg, "unique constraint") ||
 		strings.Contains(msg, "violates unique")
 }
-
