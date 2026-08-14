@@ -6,10 +6,12 @@ import (
 	"github.com/walfa-labs/backend/internal/port"
 )
 
+// ProfileHandler handles profile request endpoints.
 type ProfileHandler struct {
 	svc port.ProfileService
 }
 
+// NewProfileHandler constructs the profile HTTP handlers bound to the profile service.
 func NewProfileHandler(svc port.ProfileService) *ProfileHandler {
 	return &ProfileHandler{svc: svc}
 }
