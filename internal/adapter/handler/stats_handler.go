@@ -8,11 +8,13 @@ import (
 	"github.com/walfa-labs/backend/internal/port"
 )
 
+// StatsHandler handles stats and tags endpoints.
 type StatsHandler struct {
 	svc     port.StatsService
 	tagRepo port.TagRepo
 }
 
+// NewStatsHandler constructs the stats HTTP handlers bound to the stats service and tag repo.
 func NewStatsHandler(svc port.StatsService, tagRepo port.TagRepo) *StatsHandler {
 	return &StatsHandler{svc: svc, tagRepo: tagRepo}
 }
